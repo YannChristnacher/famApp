@@ -22,4 +22,4 @@ Chaque feature a son plan dans `doc/features/<id>-<slug>.md` avant d'être codé
 | F11 | Consultation des bibliothèques et garages des autres membres (lecture seule) | Library, Garage | F06, F10 | à faire |
 | F12 | Recherche globale : endpoint agrégé par module + palette `UDashboardSearch` | Core | F11 | à faire |
 | F13 | Page de contrôle admin : demandes, compteurs, derniers ajouts, connexions, jobs en échec, erreurs, appels Google Books | Admin | F12 | à faire |
-| F14 | Déploiement production sur VPS (Docker Compose prod, guide, sauvegarde MySQL) ; configurer trustProxies pour le reverse proxy, sinon tous les visiteurs partagent la même IP dans les limiteurs | Ops | F13 | à faire |
+| F14 | Déploiement production sur VPS (Docker Compose prod, guide, sauvegarde MySQL) ; configurer trustProxies pour le reverse proxy, sinon tous les visiteurs partagent la même IP dans les limiteurs ; les liens d'invitation signés exigent la bonne config proxy/HTTPS (sinon refusés) ; masquer le paramètre `signature` des URL dans les logs Nginx | Ops | F13 | à faire |
