@@ -4,13 +4,15 @@ use App\Enums\AccountRequestStatus;
 use App\Models\Auth\AccountRequest;
 use App\Models\User;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Testing\TestResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 use function Pest\Laravel\actingAs;
 use function Pest\Laravel\get;
 use function Pest\Laravel\post;
 
 /**
- * @return array<string, Closure(AccountRequest): Illuminate\Testing\TestResponse<Symfony\Component\HttpFoundation\Response>>
+ * @return array<string, Closure(AccountRequest): TestResponse<Response>>
  */
 function adminAccountRequestCalls(): array
 {

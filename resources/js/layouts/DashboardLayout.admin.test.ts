@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest'
-import { router } from '@inertiajs/vue3'
 import { mountWithUi } from '@/test/mountWithUi'
 import { testPage, testUser } from '@/test/testPage'
 import DashboardLayout from './DashboardLayout.vue'
@@ -38,16 +37,5 @@ describe('DashboardLayout flash toasts', () => {
     }))
 
     await vi.waitFor(() => expect(document.body.textContent).toContain('Le compte de Paul a été créé.'))
-  })
-
-  it('stops listening to the flashes once unmounted', async () => {
-    testPage.props.auth.user = testUser
-    const off = vi.fn()
-    const on = vi.spyOn(router, 'on').mockReturnValue(off)
-    const wrapper = await mountLayout()
-
-    expect(on).toHaveBeenCalledWith('flash', expect.any(Function))
-    wrapper.unmount()
-    expect(off).toHaveBeenCalled()
   })
 })

@@ -31,7 +31,7 @@ describe('DashboardLayout navigation filtered by the shared role', () => {
   it('shows admin entries to an admin', async () => {
     testPage.props.auth.user = { ...testUser, role: 'admin' }
 
-    expect(await menuLabels()).toEqual(['Accueil', 'Administration'])
+    expect(await menuLabels()).toEqual(['Accueil', 'Demandes de compte', 'Administration'])
   })
 
   it('shows the user menu in the sidebar footer', async () => {

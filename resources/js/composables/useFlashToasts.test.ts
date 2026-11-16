@@ -1,5 +1,30 @@
 import { describe, expect, it, vi } from 'vitest'
-import { showFlashToast } from './useFlashToasts'
+import { defineComponent } from 'vue'
+import { mount } from '@vue/test-utils'
+import { router } from '@inertiajs/vue3'
+import ui from '@nuxt/ui/vue-plugin'
+import { showFlashToast, useFlashToasts } from './useFlashToasts'
+
+describe('useFlashToasts', () => {
+  it('listens to the Inertia flashes while mounted only', () => {
+    const off = vi.fn()
+    const on = vi.spyOn(router, 'on').mockReturnValue(off)
+    const Host = defineComponent({
+      setup() {
+        useFlashToasts()
+
+        return () => null
+      },
+    })
+
+    const wrapper = mount(Host, { global: { plugins: [ui] } })
+    expect(on).toHaveBeenCalledWith('flash', expect.any(Function))
+    expect(off).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+    expect(off).toHaveBeenCalledOnce()
+  })
+})
 
 describe('showFlashToast', () => {
   it('adds a green toast for a success', () => {

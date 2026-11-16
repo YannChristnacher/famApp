@@ -38,7 +38,8 @@ describe('Admin/AccountRequests/CreateAccount', () => {
       { label: 'Membre', value: 'user' },
       { label: 'Administrateur', value: 'admin' },
     ])
-    expect(wrapper.find('a[href="/admin/account-requests"]').text()).toBe('Annuler')
+    const cancel = wrapper.findAll('a[href="/admin/account-requests"]').find((link) => link.text() === 'Annuler')
+    expect(cancel?.exists()).toBe(true)
   })
 
   it('posts the edited name, email and role to the account creation route', async () => {
