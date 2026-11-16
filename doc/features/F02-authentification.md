@@ -47,8 +47,8 @@ Hypothèses :
 - Relancer le seeder sur un compte existant le (re)passe `admin` mais ne modifie ni son nom ni son mot de passe (un mot de passe réinitialisé n'est pas écrasé).
 - `ADMIN_NAME` a une valeur par défaut (« Administrateur ») ; seuls l'email et le mot de passe sont obligatoires.
 - Le lien de réinitialisation expire selon `auth.passwords.users.expire` (60 min), mentionné dans l'email.
-- Les routes POST `user/confirm-password` et GET `user/confirmed-password-status` restent enregistrées par Fortify quoi qu'on configure ; elles exigent d'être connecté et ne sont pas exposées au front.
-- La demande de lien n'a pas de limite propre en plus de celle du broker Laravel (60 s par compte) ; le message neutre masque aussi cette limite.
+- ~~Les routes de confirmation de mot de passe restent enregistrées par Fortify~~ : depuis la relecture, `Fortify::ignoreRoutes()` et seules les routes nécessaires sont déclarées dans `routes/web.php`.
+- ~~La demande de lien n'a pas de limite propre~~ : limite par IP ajoutée à la relecture.
 
 ## Status
 - Branch: feature/F02-authentification
@@ -60,3 +60,15 @@ Notes d'implémentation :
 - Le bouton de repli de la sidebar passe dans la navbar (`#leading`, comme le modèle dashboard de Nuxt UI) pour laisser toute la largeur du pied de sidebar au menu utilisateur.
 - Les stubs Fortify inutiles (création d'utilisateur, profil, changement de mot de passe) et les migrations 2FA/passkeys publiées par Fortify ne sont pas conservés. `laravel/passkeys` est une dépendance imposée par Fortify 1.42, mais la fonctionnalité est désactivée et ses routes ne sont pas enregistrées.
 - Ziggy : tests Vitest — `test/setup.ts` déclare les routes d'authentification ; `testPage` porte `auth.user` et `status`, réinitialisés après chaque test.
+
+## Relecture (2026-11-16)
+Relecteur indépendant, corrigé sur la même branche :
+- Bloquant — énumération d'emails par `POST /reset-password` (email inconnu : « aucun utilisateur », email connu : « jeton invalide ») : `FailedPasswordResetResponse` liée à `InvalidPasswordResetResponse`, même message dans les deux cas (« Ce lien de réinitialisation est invalide ou a expiré… »), limite par IP (5/min). Test : email inconnu = même erreur et même redirection qu'un email connu avec un mauvais jeton.
+- Bloquant — page blanche après expiration de session (Inertia suivait le 302 vers `/login` en gardant la liste Ziggy du groupe `auth`) : une requête Inertia non authentifiée reçoit `Inertia::location(route('login'))` (409 + `X-Inertia-Location`, URL visée mémorisée pour les GET), via `App\Http\Responses\Auth\UnauthenticatedResponse` branché dans `bootstrap/app.php` ; cas inverse traité par le middleware `guest` remplacé par `RedirectAuthenticatedUsers` (utilisateur connecté vers une page invité → rechargement complet vers l'accueil). Tests Pest des deux sens, et des requêtes hors Inertia (302) et JSON (401) inchangées ; scénario vérifié dans le navigateur (cookies effacés puis clic dans le menu → page de connexion fonctionnelle).
+- Les routes d'authentification sont désormais déclarées dans `routes/web.php` avec les contrôleurs Fortify (`Fortify::ignoreRoutes()`), ce qui permet un limiteur par route et supprime les routes de confirmation de mot de passe.
+- Limites par IP (réponse française « Trop de tentatives… » sous le champ email, sans 429 brut) : connexion 20/min (en plus du verrouillage Fortify 5 échecs par email + IP), demande de lien 5/min, réinitialisation 5/min. Testées.
+- `ResetPasswordNotification` implémente `ShouldQueue` (le temps de réponse ne révèle plus l'existence d'un compte). Testé.
+- `authenticateSessions()` : une session dont le mot de passe a changé ailleurs est déconnectée ; la réinitialisation renouvelle aussi le `remember_token` (appareils mémorisés). Testé.
+- Seeder : email normalisé en minuscules (recherche et enregistrement), `ADMIN_PASSWORD` validé par `Password::default()` avec un échec explicite. Testé.
+- Connexion : assertion que l'identifiant de session change.
+- Tests Pest : helper `inertiaHeaders()` (`tests/Pest.php`) qui envoie aussi `X-Inertia-Version`, sinon le contrôle de version d'Inertia remplace la réponse par un 409 vers l'URL courante.
