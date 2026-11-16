@@ -44,8 +44,16 @@ Hypothèses :
 - Tests passing: yes (composer test, composer lint, npm run test, npm run lint, npm run build en local)
 
 Notes d'implémentation :
-- `config/ziggy.php` : la fonction `route()` vient du paquet npm `ziggy-js` (`skip-route-function`), les routes internes `storage.*` ne sont pas exposées.
-- Ziggy n'imprime la liste complète des routes qu'une fois par processus PHP : `tests/TestCase.php` remet `BladeRouteGenerator::$generated` à `false` avant chaque test.
-- Tests Vitest : `usePage()` d'Inertia est simulé (les liens Nuxt UI en mode Inertia en ont besoin) et `<Icon>` d'Iconify est remplacé par un stub hors ligne (`test/stubs/IconifyIconStub.ts`) ; happy-dom démarre sur `http://localhost/`.
+- `config/ziggy.php` : la fonction `route()` vient du paquet npm `ziggy-js` (`skip-route-function`) ; seules les routes de la liste d'autorisation `only` sont imprimées dans la page.
+- Ziggy met la liste des routes en cache et ne l'imprime en entier qu'une fois par processus PHP : `tests/TestCase.php` remet `BladeRouteGenerator::$generated` à `false` et appelle `Ziggy::clearRoutes()` avant chaque test.
+- Tests Vitest : `usePage()` d'Inertia renvoie une page statique modifiable (`test/testPage.ts`), dont les tests changent l'URL pour simuler une visite.
 - Le groupe « Thème » que `UDashboardSearch` ajoute par défaut est désactivé (`:color-mode="false"`), le mode sombre configurable étant hors périmètre.
-- En production, les icônes Lucide sont chargées à la demande depuis l'API Iconify (comportement par défaut de Nuxt UI en mode Vue).
+- Les icônes Lucide sont embarquées dans le bundle au build (`@iconify-json/lucide` + `icon.clientBundle.scan` du plugin Nuxt UI, dans Vite et Vitest) : aucune icône n'est demandée à l'API Iconify à l'exécution. L'URL de l'API ne subsiste dans le build que comme repli interne de `@iconify/vue`.
+
+## Relecture (2026-11-16)
+Relecteur indépendant, corrigé sur la même branche :
+- Bloquant : icônes embarquées localement (`@iconify-json/lucide`, `icon: { clientBundle: { scan: true } }` dans `vite.config.ts` et `vitest.config.ts`) ; vérifié que `house`, `search`, `panel-left-*`, `chevron-right`, `x` sont dans `public/build`. Le stub d'icône des tests est supprimé ; le layout vérifie qu'un `<svg>` est rendu hors ligne.
+- Ziggy en liste d'autorisation (`only` dans `config/ziggy.php`) ; test Pest qui garantit qu'une route nommée non autorisée (`admin.secret`) n'est pas imprimée ; règle ajoutée dans CLAUDE.md.
+- État actif du menu calculé depuis `usePage().url` (fonction pure `isActiveUrl`, testée : racine exacte, sous-pages d'une entrée) au lieu de `route().current()` ; test Vitest de la mise à jour après changement d'URL.
+- `mountWithUi` transmet toutes les options de montage et renvoie le wrapper du composant testé ; la racine `<UApp>` + locale `fr` est factorisée dans `resources/js/appRoot.ts`, partagée par `app.ts` et les tests ; démontage automatique (`enableAutoUnmount`).
+- CI : `npm run build` ajouté au job `frontend`.

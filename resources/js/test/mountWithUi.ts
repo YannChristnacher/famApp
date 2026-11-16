@@ -3,24 +3,24 @@ import { defineComponent, h } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import type { ComponentMountingOptions } from '@vue/test-utils'
 import ui from '@nuxt/ui/vue-plugin'
-import UApp from '@nuxt/ui/components/App.vue'
-import { fr } from '@nuxt/ui/locale'
+import { renderInAppRoot } from '@/appRoot'
 
 /**
- * Mounts a component inside <UApp> (French locale) with the Nuxt UI plugin
- * installed, exactly as the real application root does in app.ts.
+ * Mounts a component inside the application root (<UApp>, French locale) with the
+ * Nuxt UI plugin installed, as app.ts does, and returns the wrapper of that component.
+ * Every mounting option is forwarded; props and slots go to the tested component.
  */
 export async function mountWithUi<T extends Component>(
   component: T,
   options: ComponentMountingOptions<T> = {},
 ) {
-  const { props, slots, global, attachTo } = options
+  const { props, slots, global, ...mountOptions } = options
   const TestRoot = defineComponent({
     name: 'TestRoot',
-    setup: () => () => h(UApp, { locale: fr }, () => h(component, props ?? {}, slots ?? {})),
+    setup: () => () => renderInAppRoot(() => h(component, props ?? {}, slots ?? {})),
   })
-  const wrapper = mount(TestRoot, {
-    attachTo,
+  const root = mount(TestRoot, {
+    ...(mountOptions as ComponentMountingOptions<typeof TestRoot>),
     global: {
       ...global,
       plugins: [ui, ...(global?.plugins ?? [])],
@@ -28,5 +28,5 @@ export async function mountWithUi<T extends Component>(
   })
   await flushPromises()
 
-  return wrapper
+  return root.findComponent(component)
 }

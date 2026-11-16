@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { NavigationEntry } from './types'
-import { filterEntriesByRoles, navigationRegistry, toNavigationMenuItems } from './registry'
+import { filterEntriesByRoles, isActiveUrl, navigationRegistry, toNavigationMenuItems } from './registry'
 
 const publicEntry: NavigationEntry = { label: 'Accueil', icon: 'i-lucide-house', route: 'home', requiredRole: null }
 const adminEntry: NavigationEntry = { label: 'Administration', icon: 'i-lucide-shield', route: 'admin.index', requiredRole: 'admin' }
@@ -42,5 +42,20 @@ describe('toNavigationMenuItems', () => {
       { label: 'Accueil', icon: 'i-lucide-house', to: '/resolved/home', active: true },
       { label: 'Administration', icon: 'i-lucide-shield', to: '/resolved/admin.index', active: false },
     ])
+  })
+})
+
+describe('isActiveUrl', () => {
+  it('matches the home url exactly', () => {
+    expect(isActiveUrl('/', '/')).toBe(true)
+    expect(isActiveUrl('/?page=2', '/')).toBe(true)
+    expect(isActiveUrl('/bibliotheque', '/')).toBe(false)
+  })
+
+  it('matches an entry url and its sub-pages', () => {
+    expect(isActiveUrl('/bibliotheque', '/bibliotheque')).toBe(true)
+    expect(isActiveUrl('/bibliotheque/livres/3', '/bibliotheque')).toBe(true)
+    expect(isActiveUrl('/bibliotheques', '/bibliotheque')).toBe(false)
+    expect(isActiveUrl('/garage', '/bibliotheque')).toBe(false)
   })
 })

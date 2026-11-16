@@ -3,9 +3,8 @@ import type { DefineComponent } from 'vue'
 import { createApp, h } from 'vue'
 import { createInertiaApp } from '@inertiajs/vue3'
 import ui from '@nuxt/ui/vue-plugin'
-import UApp from '@nuxt/ui/components/App.vue'
-import { fr } from '@nuxt/ui/locale'
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers'
+import { renderInAppRoot } from './appRoot'
 
 const appName = import.meta.env.VITE_APP_NAME || 'famApp'
 
@@ -17,7 +16,7 @@ createInertiaApp({
       import.meta.glob<DefineComponent>('./pages/**/*.vue'),
     ),
   setup({ el, App, props, plugin }) {
-    createApp({ render: () => h(UApp, { locale: fr }, () => h(App, props)) })
+    createApp({ render: () => renderInAppRoot(() => h(App, props)) })
       .use(plugin)
       .use(ui)
       .mount(el)

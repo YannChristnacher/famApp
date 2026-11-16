@@ -9,8 +9,12 @@ return [
     'skip-route-function' => true,
 
     /*
-    | Framework-internal routes are never needed by the front end.
+    | Allowlist of the named routes printed in every page by @routes, guests
+    | included. Any route used by the front end must be added here explicitly;
+    | never expose admin routes to pages visitors can reach.
     */
-    'except' => ['storage.*'],
+    'only' => [
+        'home',
+    ],
 
 ];

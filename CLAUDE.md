@@ -39,6 +39,7 @@ Modules : `Core`, `Auth`, `Admin`, `Library`, `Garage`. Un nouveau module décla
 - Affectation en masse depuis `$request->validated()`.
 - Injection de dépendances, pas de `new` sur les services ; `config()` dans le code, jamais `env()`.
 - Aucune logique dans les fichiers de routes ; routes nommées.
+- Routes côté front via Ziggy (`route()` de `ziggy-js`) : toute route nommée utilisée par le front doit être ajoutée **explicitement** à la liste `only` de `config/ziggy.php` (liste d'autorisation imprimée dans chaque page, visiteurs compris ; jamais de route admin).
 - PSR-12 et conventions Laravel (vérifiées par Pint).
 - Interface **en français uniquement, sans fichiers de traduction** (seuls les messages de validation Laravel sont en `lang/fr`). Code, noms, commits en anglais.
 

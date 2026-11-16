@@ -1,4 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
+import { testPage } from '@/test/testPage'
 import { mountWithUi } from '@/test/mountWithUi'
 import DashboardLayout from './DashboardLayout.vue'
 
@@ -16,6 +18,10 @@ async function mountLayout(options: { attachTo?: HTMLElement } = {}) {
 }
 
 describe('DashboardLayout', () => {
+  afterEach(() => {
+    testPage.url = '/'
+  })
+
   it('renders the title given by the page in the navbar', async () => {
     const wrapper = await mountLayout()
 
@@ -50,6 +56,18 @@ describe('DashboardLayout', () => {
       { label: 'Accueil', icon: 'i-lucide-house', to: '/', active: true },
     ])
     expect(menu.text()).toContain('Accueil')
+    expect(menu.find('svg').exists()).toBe(true)
+  })
+
+  it('updates the active entry when the Inertia page url changes', async () => {
+    const wrapper = await mountLayout()
+    const menu = () => wrapper.findComponent({ name: 'NavigationMenu' })
+    expect(menu().props('items')[0].active).toBe(true)
+
+    testPage.url = '/autre-page'
+    await nextTick()
+
+    expect(menu().props('items')[0].active).toBe(false)
   })
 
   it('opens the search palette with a French empty state', async () => {
@@ -63,6 +81,5 @@ describe('DashboardLayout', () => {
       expect(wrapper.findComponent({ name: 'CommandPalette' }).exists()).toBe(true)
       expect(document.body.textContent).toContain('La recherche dans les livres et les outils arrive bientôt.')
     })
-    wrapper.unmount()
   })
 })

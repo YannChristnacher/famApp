@@ -6,7 +6,7 @@ import { fileURLToPath, URL } from 'node:url'
 export default defineConfig({
   plugins: [
     vue(),
-    ui({ router: 'inertia' }),
+    ui({ router: 'inertia', icon: { clientBundle: { scan: true } } }),
   ],
   resolve: {
     alias: {
@@ -15,9 +15,6 @@ export default defineConfig({
   },
   test: {
     environment: 'happy-dom',
-    environmentOptions: {
-      happyDOM: { url: 'http://localhost/' },
-    },
     include: ['resources/js/**/*.test.ts'],
     setupFiles: ['resources/js/test/setup.ts'],
     server: {

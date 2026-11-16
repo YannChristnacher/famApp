@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Head } from '@inertiajs/vue3'
+import { Head, usePage } from '@inertiajs/vue3'
 import type { BreadcrumbItem } from '@nuxt/ui'
 import { route } from 'ziggy-js'
-import { filterEntriesByRoles, navigationRegistry, toNavigationMenuItems } from '@/navigation/registry'
+import { filterEntriesByRoles, isActiveUrl, navigationRegistry, toNavigationMenuItems } from '@/navigation/registry'
 
 defineProps<{
   title: string
@@ -13,10 +13,13 @@ defineProps<{
 // No role exists yet: F02 will provide the authenticated user's roles.
 const userRoles: string[] = []
 
+const page = usePage()
+const relativeUrl = (name: string) => route(name, undefined, false)
+
 const navigationItems = computed(() =>
   toNavigationMenuItems(filterEntriesByRoles(navigationRegistry, userRoles), {
-    url: (name) => route(name, undefined, false),
-    isActive: (name) => route().current(name),
+    url: relativeUrl,
+    isActive: (name) => isActiveUrl(page.url, relativeUrl(name)),
   }),
 )
 </script>

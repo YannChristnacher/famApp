@@ -22,6 +22,7 @@ export default defineConfig({
     tailwindcss(),
     ui({
       router: 'inertia',
+      icon: { clientBundle: { scan: true } },
       ui: {
         colors: {
           primary: 'emerald',

@@ -24,3 +24,16 @@ export function toNavigationMenuItems(
     active: resolvers.isActive(entry.route),
   }))
 }
+
+/**
+ * An entry is active on its own url and on its sub-pages; the root url only matches itself.
+ */
+export function isActiveUrl(currentUrl: string, entryUrl: string): boolean {
+  const currentPath = currentUrl.split(/[?#]/)[0] ?? ''
+
+  if (entryUrl === '/') {
+    return currentPath === '/'
+  }
+
+  return currentPath === entryUrl || currentPath.startsWith(`${entryUrl}/`)
+}
