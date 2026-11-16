@@ -6,7 +6,7 @@ import { fileURLToPath, URL } from 'node:url'
 export default defineConfig({
   plugins: [
     vue(),
-    ui({ router: 'inertia' }),
+    ui({ router: 'inertia', icon: { clientBundle: { scan: true } } }),
   ],
   resolve: {
     alias: {
