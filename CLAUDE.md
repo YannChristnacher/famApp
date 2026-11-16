@@ -62,6 +62,18 @@ npm run build
 
 Une feature n'est terminée que si **toutes** ces commandes passent.
 
+Conventions de test :
+- Pest : utiliser les fonctions `Pest\Laravel\get()`, `post()`, `actingAs()`… plutôt que `$this->get()` (Larastan ne sait pas typer `$this` dans les closures Pest).
+- Vitest : monter les composants avec `mountWithUi()` (`resources/js/test/mountWithUi.ts`) ; `<Head>` d'Inertia est neutralisé dans `resources/js/test/setup.ts`.
+- Les tests n'ont pas besoin du build Vite (`withoutVite()` dans `tests/TestCase.php`).
+
+## Environnement de travail de Claude (session cloud)
+
+- PHP 8.3 en local (le Docker et la CI utilisent 8.4) ; `composer.json` fige `config.platform.php` à 8.3.6 pour que le lock reste installable partout.
+- Les archives GitHub (`api.github.com/.../zipball`) sont refusées par le proxy : installer avec `composer require|update --prefer-source`. `phpstan/phpstan` n'a pas de source git : en cas de nouvelle version, lancer `scripts/seed-phpstan-cache.sh <version>` avant Composer.
+- Pas de démon Docker : les tests tournent directement en PHP/Node, la CI construit l'image.
+- Exporter `COMPOSER_ALLOW_SUPERUSER=1` avant d'appeler Composer.
+
 ## Workflow (boucle autonome)
 
 1. Prendre la première feature `à faire` du backlog dont les dépendances sont `terminée`.

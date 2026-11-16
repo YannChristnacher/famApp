@@ -8,7 +8,7 @@ Chaque feature a son plan dans `doc/features/<id>-<slug>.md` avant d'être codé
 
 | ID  | Feature | Module | Dépend de | Statut |
 | --- | --- | --- | --- | --- |
-| F00 | Socle : Laravel, Inertia, Vue + TS, Nuxt UI, Docker, CI, outils qualité | Core | — | à faire |
+| F00 | Socle : Laravel, Inertia, Vue + TS, Nuxt UI, Docker, CI, outils qualité | Core | — | en relecture |
 | F01 | Layout dashboard : sidebar (registre de modules), header (titre, fil d'Ariane, bouton recherche) | Core | F00 | à faire |
 | F02 | Authentification : connexion, déconnexion, mot de passe oublié, rôles admin/user, seeder admin | Auth | F01 | à faire |
 | F03 | Demande de création de compte : formulaire public, limite de débit, email à l'admin | Auth | F02 | à faire |
