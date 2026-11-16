@@ -32,13 +32,7 @@ jobs:
           php-version: "8.4"
           extensions: pdo_mysql, intl, zip, gd, exif, bcmath
           coverage: none
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
       - run: composer install --no-interaction --no-progress --prefer-dist
-      - run: npm ci
-      - run: npm run build
       - run: cp .env.example .env && php artisan key:generate
       - run: composer lint
       - run: composer test

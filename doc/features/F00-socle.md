@@ -18,7 +18,7 @@ Mettre en place une application Laravel 13 + Inertia + Vue 3 (TypeScript) + Nuxt
 - [x] AC6: Given le code, when on lance `composer test` et `npm run test`, then Pest et Vitest passent.
 - [x] AC7: Given le code, when on lance `npm run build`, then `public/build/manifest.json` est produit.
 - [x] AC8: Given `.env.example`, then il pointe vers les services Docker (`DB_HOST=mysql`, `MAIL_HOST=mailpit`), et `phpunit.xml` utilise SQLite en mémoire.
-- [ ] AC9: Given la CI GitHub Actions, when une pull request est ouverte, then les jobs `backend` (MySQL), `frontend` et `docker` (build de l'image `prod`) sont verts.
+- [x] AC9: Given la CI GitHub Actions, when une pull request est ouverte, then les jobs `backend` (MySQL), `frontend` et `docker` (build de l'image `prod`) sont verts.
 
 ## Technical approach
 1. `composer create-project laravel/laravel` (13.x), sans starter kit : l'UI du starter kit officiel (shadcn-vue) serait remplacée de toute façon par Nuxt UI.
@@ -34,4 +34,8 @@ Risque : la compatibilité Nuxt UI ↔ Inertia (peer dependency). On fige les ve
 ## Status
 - Branch: feature/F00-socle
 - Tests written: yes (tests/Feature/Core/HomeTest.php, tests/Feature/Core/LocaleTest.php, resources/js/pages/Core/Home.test.ts)
-- Tests passing: yes en local (AC1 à AC8) ; AC9 vérifié sur la pull request
+- Tests passing: yes (AC1 à AC8 en local, AC9 sur la CI de la PR #1)
+
+## Relecture (2026-11-16)
+Relecteur indépendant : aucun point bloquant. Corrigés : `|| true` qui masquait un échec de `composer install` dans l'image prod, `COMPOSER_ALLOW_SUPERUSER` et `.npmrc` dans le Dockerfile, UID/GID du service `queue`, build Vite inutile dans le job backend, fichiers de traduction superflus supprimés, test AC2 renforcé (présence réelle des composants Nuxt UI).
+Reporté à F01 : déplacer `<UApp>` de la page vers le layout racine.

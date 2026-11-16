@@ -23,14 +23,15 @@ USER www-data
 # --- Production image: code and built assets baked in ---
 FROM node:22-bookworm-slim AS assets
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc ./
 RUN npm ci
 COPY . .
 RUN npm run build
 
 FROM base AS prod
+ENV COMPOSER_ALLOW_SUPERUSER=1
 COPY --chown=www-data:www-data . .
 COPY --from=assets --chown=www-data:www-data /app/public/build ./public/build
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress \
-    && php artisan storage:link || true
+    && (php artisan storage:link || true)
 USER www-data
