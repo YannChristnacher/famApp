@@ -12,3 +12,11 @@ it('renders the home page through Inertia', function () {
             ->where('appName', config('app.name'))
         );
 });
+
+it('exposes the named routes used by the navigation registry to the front end', function () {
+    get('/')
+        ->assertOk()
+        ->assertSee('const Ziggy=', false)
+        ->assertSee('"home":{"uri":"\/"', false)
+        ->assertDontSee('storage.local', false);
+});

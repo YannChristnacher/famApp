@@ -3,6 +3,7 @@
 namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Tighten\Ziggy\BladeRouteGenerator;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -11,5 +12,8 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
 
         $this->withoutVite();
+
+        // Ziggy prints the full route list only once per PHP process; each test is a fresh page.
+        BladeRouteGenerator::$generated = false;
     }
 }

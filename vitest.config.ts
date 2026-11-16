@@ -15,6 +15,9 @@ export default defineConfig({
   },
   test: {
     environment: 'happy-dom',
+    environmentOptions: {
+      happyDOM: { url: 'http://localhost/' },
+    },
     include: ['resources/js/**/*.test.ts'],
     setupFiles: ['resources/js/test/setup.ts'],
     server: {
