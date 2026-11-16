@@ -33,10 +33,36 @@ it('logs a user in with valid credentials and redirects to home', function () {
     assertAuthenticatedAs($user);
 });
 
+it('renews the session id on login', function () {
+    $user = User::factory()->create(['password' => 'secret-password']);
+    get(route('login'));
+    $guestSessionId = session()->getId();
+
+    post(route('login.store'), ['email' => $user->email, 'password' => 'secret-password']);
+
+    expect(session()->getId())->not->toBe($guestSessionId);
+    assertAuthenticatedAs($user);
+});
+
+it('limits the login attempts per IP address, whatever the email (password spraying)', function () {
+    $user = User::factory()->create(['password' => 'secret-password']);
+
+    foreach (range(1, 20) as $attempt) {
+        post(route('login.store'), ['email' => "personne{$attempt}@example.com", 'password' => 'devine']);
+    }
+
+    from(route('login'))
+        ->post(route('login.store'), ['email' => $user->email, 'password' => 'secret-password'])
+        ->assertRedirect(route('login'))
+        ->assertSessionHasErrors(['email' => 'Trop de tentatives. Veuillez patienter une minute avant de réessayer.']);
+
+    assertGuest();
+});
+
 it('forces a full page visit to home after an Inertia login so the authenticated routes are loaded', function () {
     $user = User::factory()->create(['password' => 'secret-password']);
 
-    withHeaders(['X-Inertia' => 'true'])
+    withHeaders(inertiaHeaders())
         ->post(route('login.store'), ['email' => $user->email, 'password' => 'secret-password'])
         ->assertStatus(409)
         ->assertHeader('X-Inertia-Location', route('home'));

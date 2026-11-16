@@ -58,3 +58,28 @@ it('fails clearly when the admin password is missing', function () {
         ->toThrow(RuntimeException::class, 'ADMIN_PASSWORD');
     expect(User::query()->count())->toBe(0);
 });
+
+it('stores and looks up the admin email in lower case', function () {
+    config(['famapp.admin.email' => 'Admin@FamApp.test']);
+    seed(AdminUserSeeder::class);
+    seed(AdminUserSeeder::class);
+
+    expect(User::query()->sole()->email)->toBe('admin@famapp.test');
+});
+
+it('finds an existing admin whatever the case of the configured email', function () {
+    User::factory()->create(['email' => 'admin@famapp.test']);
+    config(['famapp.admin.email' => 'ADMIN@famapp.test']);
+
+    seed(AdminUserSeeder::class);
+
+    expect(User::query()->sole()->role)->toBe(Role::Admin);
+});
+
+it('fails clearly when the admin password is too weak', function () {
+    config(['famapp.admin.password' => 'court']);
+
+    expect(fn () => seed(AdminUserSeeder::class))
+        ->toThrow(RuntimeException::class, 'ADMIN_PASSWORD');
+    expect(User::query()->count())->toBe(0);
+});

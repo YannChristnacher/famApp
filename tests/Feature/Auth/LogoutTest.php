@@ -18,7 +18,7 @@ it('logs the user out and sends them back to the login page', function () {
 it('forces a full page visit to the login page after an Inertia logout', function () {
     actingAs(User::factory()->create());
 
-    withHeaders(['X-Inertia' => 'true'])
+    withHeaders(inertiaHeaders())
         ->post(route('logout'))
         ->assertStatus(409)
         ->assertHeader('X-Inertia-Location', route('login'));

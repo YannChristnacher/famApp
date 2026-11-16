@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Notifications\Auth\ResetPasswordNotification;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
@@ -13,6 +14,7 @@ use function Pest\Laravel\get;
 use function Pest\Laravel\post;
 
 const NEUTRAL_RESET_LINK_STATUS = 'Si un compte correspond à cette adresse, un lien de réinitialisation vient de lui être envoyé.';
+const INVALID_RESET_LINK_ERROR = 'Ce lien de réinitialisation est invalide ou a expiré. Demandez-en un nouveau.';
 
 it('renders the forgot password page for guests', function () {
     get(route('password.request'))
@@ -106,7 +108,7 @@ it('refuses an invalid token with a French error and keeps the password', functi
             'password' => 'nouveau-mot-de-passe',
             'password_confirmation' => 'nouveau-mot-de-passe',
         ])
-        ->assertSessionHasErrors(['email' => "Ce jeton de réinitialisation du mot de passe n'est pas valide."]);
+        ->assertSessionHasErrors(['email' => INVALID_RESET_LINK_ERROR]);
 
     expect(Hash::check('ancien-mot-de-passe', (string) $user->fresh()?->password))->toBeTrue();
 });
@@ -123,4 +125,62 @@ it('requires a confirmed password to reset it', function () {
             'password_confirmation' => 'autre-chose',
         ])
         ->assertSessionHasErrors('password');
+});
+
+it('answers an unknown email exactly like a known email with a wrong token', function () {
+    $user = User::factory()->create();
+    $attempt = fn (string $email) => from(route('password.reset', ['token' => 'faux']))
+        ->post(route('password.update'), [
+            'token' => 'faux',
+            'email' => $email,
+            'password' => 'nouveau-mot-de-passe',
+            'password_confirmation' => 'nouveau-mot-de-passe',
+        ]);
+
+    $known = $attempt($user->email)->assertSessionHasErrors(['email' => INVALID_RESET_LINK_ERROR]);
+    $unknown = $attempt('inconnu@example.com')->assertSessionHasErrors(['email' => INVALID_RESET_LINK_ERROR]);
+
+    expect($unknown->getStatusCode())->toBe($known->getStatusCode())
+        ->and($unknown->headers->get('Location'))->toBe($known->headers->get('Location'));
+});
+
+it('limits the password reset attempts per IP address', function () {
+    foreach (range(1, 5) as $attempt) {
+        post(route('password.update'), [
+            'token' => 'faux',
+            'email' => "personne{$attempt}@example.com",
+            'password' => 'nouveau-mot-de-passe',
+            'password_confirmation' => 'nouveau-mot-de-passe',
+        ]);
+    }
+
+    from(route('password.reset', ['token' => 'faux']))
+        ->post(route('password.update'), [
+            'token' => 'faux',
+            'email' => 'personne6@example.com',
+            'password' => 'nouveau-mot-de-passe',
+            'password_confirmation' => 'nouveau-mot-de-passe',
+        ])
+        ->assertRedirect(route('password.reset', ['token' => 'faux']))
+        ->assertSessionHasErrors(['email' => 'Trop de tentatives. Veuillez patienter une minute avant de réessayer.']);
+});
+
+it('limits the reset link requests per IP address', function () {
+    Notification::fake();
+
+    foreach (range(1, 5) as $attempt) {
+        post(route('password.email'), ['email' => "personne{$attempt}@example.com"]);
+    }
+    $user = User::factory()->create();
+
+    from(route('password.request'))
+        ->post(route('password.email'), ['email' => $user->email])
+        ->assertRedirect(route('password.request'))
+        ->assertSessionHasErrors(['email' => 'Trop de tentatives. Veuillez patienter une minute avant de réessayer.']);
+
+    Notification::assertNothingSentTo($user);
+});
+
+it('queues the reset password notification so the response time does not reveal the account', function () {
+    expect(new ResetPasswordNotification('jeton'))->toBeInstanceOf(ShouldQueue::class);
 });
