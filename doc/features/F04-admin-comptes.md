@@ -26,7 +26,7 @@ Donner à l'administrateur une page « Demandes de compte » (module Admin) qui 
 - [x] AC13 (Vitest): Given la page `Admin/AccountRequests/CreateAccount`, when elle est rendue, then les champs « Nom », « Adresse email » et « Rôle » sont préremplis avec la demande (rôle `user` par défaut) et le message du demandeur est affiché ; when on modifie et soumet, then un `POST` vers `admin.account-requests.account.store` est envoyé avec `name`, `email`, `role` ; given des erreurs serveur, then elles s'affichent sous les champs.
 - [x] AC14 (Vitest): Given le registre de navigation, then il contient l'entrée « Demandes de compte » (`admin.account-requests.index`, `requiredRole: 'admin'`) ; given le `DashboardLayout`, then l'entrée est visible pour un admin et invisible pour un user.
 - [x] AC15 (Vitest): Given le `DashboardLayout` monté, when Inertia émet un flash `toast` (`{ type: 'success' | 'error', message }`), then un toast Nuxt UI avec ce message et la couleur correspondante est ajouté.
-- [ ] AC16: Given le code, when on lance `composer test`, `composer lint`, `npm run test`, `npm run lint`, `npm run build`, then tout passe, et la CI est verte.
+- [x] AC16: Given le code, when on lance `composer test`, `composer lint`, `npm run test`, `npm run lint`, `npm run build`, then tout passe, et la CI est verte.
 
 ## Technical approach
 1. **Données** : migration `add_user_id_to_account_requests_table` (`user_id` nullable, clé étrangère vers `users`, `nullOnDelete`) ; relation `AccountRequest::user()` ; méthode `isPending()`.
@@ -62,7 +62,7 @@ Hypothèses :
 ## Status
 - Branch: feature/F04-admin-comptes
 - Tests written: yes (tests/Feature/Admin/*.php, tests/Unit/Auth/SetPasswordNotificationTest.php, tests/Unit/Auth/AccountRequestedNotificationTest.php, resources/js/components/Admin/AccountRequestsTable.test.ts, resources/js/pages/Admin/AccountRequests/*.test.ts, resources/js/composables/useFlashToasts.test.ts, resources/js/layouts/DashboardLayout.admin.test.ts, resources/js/navigation/registry.test.ts)
-- Tests passing: yes en local (composer test, composer lint, npm run test, npm run lint, npm run build) ; AC16 en attente de la CI.
+- Tests passing: yes en local (composer test, composer lint, npm run test, npm run lint, npm run build) ; AC16 confirmé par la CI de la PR #5 (jobs backend, frontend, e2e, docker verts).
 
 Notes d'implémentation :
 - Le lien « définir le mot de passe » est créé par `PasswordBroker::sendResetLink()` (contrat injecté) avec un rappel qui envoie `SetPasswordNotification` au lieu de la notification de réinitialisation : même jeton, même page, même durée.
