@@ -3,11 +3,19 @@
 namespace App\Notifications\Auth;
 
 use App\Models\User;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class ResetPasswordNotification extends Notification
+/**
+ * Queued: sending the email must not make the response slower for an existing
+ * account than for an unknown email.
+ */
+class ResetPasswordNotification extends Notification implements ShouldQueue
 {
+    use Queueable;
+
     public function __construct(public readonly string $token) {}
 
     /**

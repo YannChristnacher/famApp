@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\RedirectAuthenticatedUsers;
+use App\Http\Responses\Auth\UnauthenticatedResponse;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,8 +18,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             HandleInertiaRequests::class,
         ]);
+        $middleware->alias(['guest' => RedirectAuthenticatedUsers::class]);
+        // Signs out the other sessions of a user whose password has changed.
+        $middleware->authenticateSessions();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(new UnauthenticatedResponse);
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
