@@ -28,5 +28,6 @@ declare module 'vue' {
     ULink: typeof import('./node_modules/@nuxt/ui/dist/runtime/vue/overrides/inertia/Link.vue')['default']
     UNavigationMenu: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/NavigationMenu.vue')['default']
     UPageCard: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/PageCard.vue')['default']
+    UTextarea: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/Textarea.vue')['default']
   }
 }

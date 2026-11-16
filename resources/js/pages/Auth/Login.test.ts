@@ -19,6 +19,12 @@ describe('Auth/Login', () => {
     expect(wrapper.find('a[href="/forgot-password"]').text()).toBe('Mot de passe oublié ?')
   })
 
+  it('links to the account request page', async () => {
+    const wrapper = await mountWithUi(Login)
+
+    expect(wrapper.find('a[href="/account-request"]').text()).toBe('Demander un compte')
+  })
+
   it('posts the credentials and shows the server error under the email field', async () => {
     const post = vi.spyOn(router, 'post').mockImplementation((_url, _data, options?: VisitOptions) => {
       options?.onError?.({ email: 'Ces identifiants ne correspondent pas à nos enregistrements.' })

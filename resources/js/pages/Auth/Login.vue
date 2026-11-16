@@ -83,6 +83,16 @@ function submit(event: FormSubmitEvent<LoginData>): void {
           :title="page.props.status"
         />
       </template>
+
+      <template #footer>
+        Pas encore de compte ?
+        <ULink
+          :to="route('account-request.create', undefined, false)"
+          class="text-primary font-medium"
+        >
+          Demander un compte
+        </ULink>
+      </template>
     </UAuthForm>
   </AuthLayout>
 </template>
