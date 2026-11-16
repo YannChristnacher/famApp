@@ -56,14 +56,17 @@ class AccountRequestedNotification extends Notification implements ShouldQueue
 
     /**
      * The email body is Markdown: what the visitor typed must be shown as is,
-     * never turned into HTML, a link, a heading or other formatting. Every
+     * never turned into HTML, a link, a heading or other formatting. Invisible
+     * format characters (right-to-left override, zero width…) that could
+     * disguise it are removed first. Every
      * punctuation character that HTML or Markdown could interpret becomes a
      * numeric character reference, which CommonMark treats as plain text and
      * the plain text version of the email decodes back.
      */
     private function literal(string $typed, string $prefix = '', string $suffix = ''): Htmlable
     {
-        $singleLine = trim((string) preg_replace('/\s+/u', ' ', $typed));
+        $visible = (string) preg_replace('/\p{Cf}/u', '', $typed);
+        $singleLine = trim((string) preg_replace('/\s+/u', ' ', $visible));
         $encoded = (string) preg_replace_callback(
             '/[\\\\`*_{}\[\]()#+\-.!|~=<>&"\'\/:;]/',
             fn (array $match): string => '&#'.ord($match[0]).';',
