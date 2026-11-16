@@ -10,7 +10,7 @@ Chaque feature a son plan dans `doc/features/<id>-<slug>.md` avant d'être codé
 | --- | --- | --- | --- | --- |
 | F00 | Socle : Laravel, Inertia, Vue + TS, Nuxt UI, Docker, CI, outils qualité | Core | — | terminée |
 | F01 | Layout dashboard : sidebar (registre de modules), header (titre, fil d'Ariane, bouton recherche) | Core | F00 | terminée |
-| F02 | Authentification : connexion, déconnexion, mot de passe oublié, rôles admin/user, seeder admin | Auth | F01 | en relecture |
+| F02 | Authentification : connexion, déconnexion, mot de passe oublié, rôles admin/user, seeder admin | Auth | F01 | terminée |
 | F03 | Demande de création de compte : formulaire public, limite de débit, email à l'admin | Auth | F02 | à faire |
 | F04 | Admin : liste des demandes, création du compte, email « définir mon mot de passe » | Admin | F03 | à faire |
 | F05 | Bibliothèque : CRUD des étagères | Library | F02 | à faire |
