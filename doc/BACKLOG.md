@@ -12,7 +12,7 @@ Chaque feature a son plan dans `doc/features/<id>-<slug>.md` avant d'être codé
 | F01 | Layout dashboard : sidebar (registre de modules), header (titre, fil d'Ariane, bouton recherche) | Core | F00 | terminée |
 | F02 | Authentification : connexion, déconnexion, mot de passe oublié, rôles admin/user, seeder admin | Auth | F01 | terminée |
 | F03 | Demande de création de compte : formulaire public, limite de débit, email à l'admin | Auth | F02 | terminée |
-| F04 | Admin : liste des demandes, création du compte, email « définir mon mot de passe » | Admin | F03 | en relecture |
+| F04 | Admin : liste des demandes, création du compte, email « définir mon mot de passe » | Admin | F03 | terminée |
 | F05 | Bibliothèque : CRUD des étagères | Library | F02 | à faire |
 | F06 | Bibliothèque : CRUD des livres en saisie manuelle (couverture uploadée, étagères multiples) | Library | F05 | à faire |
 | F07 | Bibliothèque : préremplissage par ISBN via Google Books (service, données brutes, couverture stockée) | Library | F06 | à faire |
