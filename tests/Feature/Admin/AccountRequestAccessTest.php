@@ -1,0 +1,69 @@
+<?php
+
+use App\Enums\AccountRequestStatus;
+use App\Models\Auth\AccountRequest;
+use App\Models\User;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Testing\TestResponse;
+use Symfony\Component\HttpFoundation\Response;
+
+use function Pest\Laravel\actingAs;
+use function Pest\Laravel\get;
+use function Pest\Laravel\post;
+
+/**
+ * @return array<string, Closure(AccountRequest): TestResponse<Response>>
+ */
+function adminAccountRequestCalls(): array
+{
+    return [
+        'index' => fn (AccountRequest $request) => get(route('admin.account-requests.index')),
+        'account.create' => fn (AccountRequest $request) => get(route('admin.account-requests.account.create', $request)),
+        'account.store' => fn (AccountRequest $request) => post(route('admin.account-requests.account.store', $request), [
+            'name' => 'Paul Martin',
+            'email' => 'paul@example.com',
+            'role' => 'user',
+        ]),
+        'reject' => fn (AccountRequest $request) => post(route('admin.account-requests.reject', $request)),
+    ];
+}
+
+it('lets an admin reach every account request route', function (string $call, int $status, ?string $redirect) {
+    Notification::fake();
+    $request = AccountRequest::factory()->create(['email' => 'paul@example.com']);
+    actingAs(User::factory()->admin()->create());
+
+    $response = adminAccountRequestCalls()[$call]($request)->assertStatus($status);
+
+    if ($redirect !== null) {
+        $response->assertRedirect(route($redirect))->assertSessionHasNoErrors();
+    }
+})->with([
+    'index' => ['index', 200, null],
+    'account.create' => ['account.create', 200, null],
+    'account.store' => ['account.store', 302, 'admin.account-requests.index'],
+    'reject' => ['reject', 302, 'admin.account-requests.index'],
+]);
+
+it('forbids a regular user every account request route and changes nothing', function (string $call) {
+    Notification::fake();
+    $request = AccountRequest::factory()->create(['email' => 'paul@example.com']);
+    actingAs(User::factory()->create());
+
+    adminAccountRequestCalls()[$call]($request)->assertForbidden();
+
+    expect($request->fresh()?->status)->toBe(AccountRequestStatus::Pending)
+        ->and(User::query()->where('email', 'paul@example.com')->exists())->toBeFalse();
+    Notification::assertNothingSent();
+})->with(['index', 'account.create', 'account.store', 'reject']);
+
+it('redirects a guest to the login page on every account request route and changes nothing', function (string $call) {
+    Notification::fake();
+    $request = AccountRequest::factory()->create(['email' => 'paul@example.com']);
+
+    adminAccountRequestCalls()[$call]($request)->assertRedirect(route('login'));
+
+    expect($request->fresh()?->status)->toBe(AccountRequestStatus::Pending)
+        ->and(User::query()->where('email', 'paul@example.com')->exists())->toBeFalse();
+    Notification::assertNothingSent();
+})->with(['index', 'account.create', 'account.store', 'reject']);

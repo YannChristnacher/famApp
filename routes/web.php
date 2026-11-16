@@ -1,7 +1,10 @@
 <?php
 
+use App\Http\Controllers\Admin\AccountRequestAccountController;
+use App\Http\Controllers\Admin\AccountRequestController as AdminAccountRequestController;
 use App\Http\Controllers\Auth\AccountRequestController;
 use App\Http\Controllers\Auth\AuthPageController;
+use App\Http\Controllers\Auth\InvitationController;
 use App\Http\Controllers\Core\HomeController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
@@ -27,6 +30,14 @@ Route::middleware('guest')->group(function () {
         ->middleware('throttle:password-reset')
         ->name('password.update');
 
+    // Signed link of the welcome email (SetPasswordNotification).
+    Route::middleware('invitation')->controller(InvitationController::class)->group(function () {
+        Route::get('/invitation/{user}', 'show')->name('invitation.show');
+        Route::post('/invitation/{user}', 'store')
+            ->middleware('throttle:password-reset')
+            ->name('invitation.store');
+    });
+
     Route::controller(AccountRequestController::class)->group(function () {
         Route::get('/account-request', 'create')->name('account-request.create');
         Route::post('/account-request', 'store')
@@ -39,4 +50,16 @@ Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
     Route::get('/', HomeController::class)->name('home');
+});
+
+Route::middleware(['auth', 'can:admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/account-requests', [AdminAccountRequestController::class, 'index'])
+        ->name('account-requests.index');
+    Route::post('/account-requests/{accountRequest}/reject', [AdminAccountRequestController::class, 'reject'])
+        ->name('account-requests.reject');
+
+    Route::controller(AccountRequestAccountController::class)->group(function () {
+        Route::get('/account-requests/{accountRequest}/account', 'create')->name('account-requests.account.create');
+        Route::post('/account-requests/{accountRequest}/account', 'store')->name('account-requests.account.store');
+    });
 });

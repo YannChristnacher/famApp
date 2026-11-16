@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureInvitationIsUsable;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RedirectAuthenticatedUsers;
 use App\Http\Responses\Auth\UnauthenticatedResponse;
@@ -18,7 +19,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             HandleInertiaRequests::class,
         ]);
-        $middleware->alias(['guest' => RedirectAuthenticatedUsers::class]);
+        $middleware->alias([
+            'guest' => RedirectAuthenticatedUsers::class,
+            'invitation' => EnsureInvitationIsUsable::class,
+        ]);
         // Signs out the other sessions of a user whose password has changed.
         $middleware->authenticateSessions();
     })
