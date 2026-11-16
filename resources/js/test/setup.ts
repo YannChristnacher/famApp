@@ -35,5 +35,7 @@ globalThis.Ziggy = {
     'password.request': { uri: 'forgot-password', methods: ['GET', 'HEAD'] },
     'password.email': { uri: 'forgot-password', methods: ['POST'] },
     'password.update': { uri: 'reset-password', methods: ['POST'] },
+    'account-request.create': { uri: 'account-request', methods: ['GET', 'HEAD'] },
+    'account-request.store': { uri: 'account-request', methods: ['POST'] },
   },
 }

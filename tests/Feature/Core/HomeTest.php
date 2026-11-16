@@ -28,6 +28,8 @@ it('exposes the named routes used by authenticated pages to the front end', func
         ->assertSee('"logout":', false)
         ->assertDontSee('"login":', false)
         ->assertDontSee('"password.request":', false)
+        ->assertDontSee('"account-request.create":', false)
+        ->assertDontSee('"account-request.store":', false)
         ->assertDontSee('storage.local', false);
 });
 
@@ -40,6 +42,8 @@ it('only exposes the authentication routes to guests', function () {
         ->assertSee('"password.request":', false)
         ->assertSee('"password.email":', false)
         ->assertSee('"password.update":', false)
+        ->assertSee('"account-request.create":', false)
+        ->assertSee('"account-request.store":', false)
         ->assertDontSee('"home":', false)
         ->assertDontSee('"logout":', false)
         ->assertDontSee('"password.reset":', false);
