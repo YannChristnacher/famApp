@@ -112,9 +112,10 @@ it('lets the new user set a password from the emailed link, then sign in', funct
         'role' => 'user',
     ]);
     $user = User::query()->where('email', 'paul@example.com')->sole();
+    expect($user->password_set_at)->toBeNull();
     $link = null;
     Notification::assertSentTo($user, SetPasswordNotification::class, function (SetPasswordNotification $notification) use ($user, &$link) {
-        $link = $notification->toMail($user)->actionUrl;
+        $link = (string) $notification->toMail($user)->actionUrl;
 
         return true;
     });
@@ -123,15 +124,10 @@ it('lets the new user set a password from the emailed link, then sign in', funct
     get($link)
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->component('Auth/ResetPassword')
+            ->component('Auth/SetPassword')
             ->where('email', 'paul@example.com'));
 
-    $query = [];
-    parse_str((string) parse_url((string) $link, PHP_URL_QUERY), $query);
-    $token = basename((string) parse_url((string) $link, PHP_URL_PATH));
-    post(route('password.update'), [
-        'token' => $token,
-        'email' => $query['email'],
+    post($link, [
         'password' => 'mon-nouveau-mot-de-passe',
         'password_confirmation' => 'mon-nouveau-mot-de-passe',
     ])->assertRedirect(route('login'))->assertSessionHasNoErrors();
@@ -219,4 +215,25 @@ it('refuses to create a second account from the same request', function () {
 
 it('answers 404 for an unknown request', function () {
     get(route('admin.account-requests.account.create', 999))->assertNotFound();
+});
+
+it('only lets an admin pass the account form request', function () {
+    $request = new App\Http\Requests\Admin\StoreAccountFromRequestRequest;
+
+    $request->setUserResolver(fn () => User::factory()->admin()->make());
+    expect($request->authorize())->toBeTrue();
+
+    $request->setUserResolver(fn () => User::factory()->make());
+    expect($request->authorize())->toBeFalse();
+
+    $request->setUserResolver(fn () => null);
+    expect($request->authorize())->toBeFalse();
+});
+
+it('only offers the member and administrator roles, the same as the form', function () {
+    $request = AccountRequest::factory()->create();
+
+    get(route('admin.account-requests.account.create', $request))
+        ->assertInertia(fn (Assert $page) => $page->where('roles', Role::assignableValues()));
+    expect(Role::assignableValues())->toBe(['user', 'admin']);
 });

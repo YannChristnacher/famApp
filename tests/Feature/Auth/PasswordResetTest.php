@@ -12,6 +12,7 @@ use function Pest\Laravel\actingAs;
 use function Pest\Laravel\from;
 use function Pest\Laravel\get;
 use function Pest\Laravel\post;
+use function Pest\Laravel\travel;
 
 const NEUTRAL_RESET_LINK_STATUS = 'Si un compte correspond à cette adresse, un lien de réinitialisation vient de lui être envoyé.';
 const INVALID_RESET_LINK_ERROR = 'Ce lien de réinitialisation est invalide ou a expiré. Demandez-en un nouveau.';
@@ -183,4 +184,22 @@ it('limits the reset link requests per IP address', function () {
 
 it('queues the reset password notification so the response time does not reveal the account', function () {
     expect(new ResetPasswordNotification('jeton'))->toBeInstanceOf(ShouldQueue::class);
+});
+
+it('keeps the forgotten password link valid for 60 minutes only', function () {
+    $user = User::factory()->create(['password' => 'ancien-mot-de-passe']);
+    $token = Password::broker()->createToken($user);
+    travel(61)->minutes();
+
+    expect(config('auth.passwords.users.expire'))->toBe(60);
+    from(route('password.reset', ['token' => $token]))
+        ->post(route('password.update'), [
+            'token' => $token,
+            'email' => $user->email,
+            'password' => 'nouveau-mot-de-passe',
+            'password_confirmation' => 'nouveau-mot-de-passe',
+        ])
+        ->assertSessionHasErrors(['email' => INVALID_RESET_LINK_ERROR]);
+
+    expect(Hash::check('ancien-mot-de-passe', (string) $user->fresh()?->password))->toBeTrue();
 });

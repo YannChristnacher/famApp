@@ -16,8 +16,8 @@ const requests: AccountRequestRow[] = [
   { id: 1, name: 'Inconnu', email: 'spam@example.com', message: 'Promo', status: 'rejected', createdAt: '2026-11-01T12:00:00+00:00' },
 ]
 
-async function mountTable(rows = requests) {
-  return mountWithUi(AccountRequestsTable, { props: { accountRequests: rows } })
+async function mountTable(rows = requests, rejectingId: number | null = null) {
+  return mountWithUi(AccountRequestsTable, { props: { accountRequests: rows, rejectingId } })
 }
 
 describe('Admin/AccountRequestsTable', () => {
@@ -71,6 +71,19 @@ describe('Admin/AccountRequestsTable', () => {
     await rejectButton?.trigger('click')
 
     expect(wrapper.emitted('reject')).toEqual([[requests[0]]])
+  })
+
+  it('shows the rejection in progress and blocks a second click', async () => {
+    const second: AccountRequestRow = { ...requests[0]!, id: 4, name: 'Léa Petit', email: 'lea@example.com' }
+    const wrapper = await mountTable([requests[0]!, second], 3)
+
+    const rejectButtons = wrapper.findAllComponents({ name: 'Button' }).filter((button) => button.text() === 'Refuser')
+    expect(rejectButtons.map((button) => [button.props('loading'), button.props('disabled')])).toEqual([
+      [true, true],
+      [false, true],
+    ])
+    await rejectButtons[0]?.trigger('click')
+    expect(wrapper.emitted('reject')).toBeUndefined()
   })
 
   it('says when there is no request', async () => {

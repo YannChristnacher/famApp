@@ -28,16 +28,22 @@ function adminAccountRequestCalls(): array
     ];
 }
 
-it('lets an admin reach every account request route', function (string $call) {
+it('lets an admin reach every account request route', function (string $call, int $status, ?string $redirect) {
     Notification::fake();
     $request = AccountRequest::factory()->create(['email' => 'paul@example.com']);
     actingAs(User::factory()->admin()->create());
 
-    $response = adminAccountRequestCalls()[$call]($request);
+    $response = adminAccountRequestCalls()[$call]($request)->assertStatus($status);
 
-    expect($response->getStatusCode())->toBeIn([200, 302])
-        ->and($response->headers->get('Location'))->not->toBe(route('login'));
-})->with(['index', 'account.create', 'account.store', 'reject']);
+    if ($redirect !== null) {
+        $response->assertRedirect(route($redirect))->assertSessionHasNoErrors();
+    }
+})->with([
+    'index' => ['index', 200, null],
+    'account.create' => ['account.create', 200, null],
+    'account.store' => ['account.store', 302, 'admin.account-requests.index'],
+    'reject' => ['reject', 302, 'admin.account-requests.index'],
+]);
 
 it('forbids a regular user every account request route and changes nothing', function (string $call) {
     Notification::fake();

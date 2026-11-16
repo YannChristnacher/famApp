@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { VisitOptions } from '@inertiajs/core'
 import { router } from '@inertiajs/vue3'
 import { mountWithUi } from '@/test/mountWithUi'
 import { testPage, testUser } from '@/test/testPage'
@@ -33,5 +34,26 @@ describe('Admin/AccountRequests/Index', () => {
     await wrapper.findAll('button').find((button) => button.text() === 'Refuser')?.trigger('click')
 
     expect(post).toHaveBeenCalledWith('/admin/account-requests/7/reject', {}, expect.objectContaining({ preserveScroll: true }))
+  })
+
+  it('marks the request as being rejected until the request finishes', async () => {
+    testPage.props.auth.user = { ...testUser, role: 'admin' }
+    let options: VisitOptions | undefined
+    const post = vi.spyOn(router, 'post').mockImplementation((_url, _data, visitOptions?: VisitOptions) => {
+      options = visitOptions
+      options?.onStart?.({} as never)
+    })
+    const wrapper = await mountWithUi(Index, { props: { accountRequests: [pending] } })
+    const table = () => wrapper.findComponent({ name: 'AccountRequestsTable' })
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Refuser')?.trigger('click')
+    expect(table().props('rejectingId')).toBe(7)
+
+    table().vm.$emit('reject', pending)
+    expect(post).toHaveBeenCalledOnce()
+
+    options?.onFinish?.({} as never)
+    await wrapper.vm.$nextTick()
+    expect(table().props('rejectingId')).toBeNull()
   })
 })

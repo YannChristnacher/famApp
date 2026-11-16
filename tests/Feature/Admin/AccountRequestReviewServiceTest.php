@@ -7,8 +7,9 @@ use App\Models\Auth\AccountRequest;
 use App\Models\User;
 use App\Notifications\Auth\SetPasswordNotification;
 use App\Services\Admin\AccountRequestReviewService;
-use Illuminate\Contracts\Auth\PasswordBroker;
+use Illuminate\Contracts\Notifications\Dispatcher;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Validation\ValidationException;
 use Mockery\MockInterface;
 
 use function Pest\Laravel\mock;
@@ -32,8 +33,8 @@ it('creates the account, approves the request and links it to the user', functio
 });
 
 it('keeps nothing when the account creation fails midway', function () {
-    mock(PasswordBroker::class, function (MockInterface $broker) {
-        $broker->shouldReceive('sendResetLink')->andThrow(new RuntimeException('Panne'));
+    mock(Dispatcher::class, function (MockInterface $notifications) {
+        $notifications->shouldReceive('send')->andThrow(new RuntimeException('Panne'));
     });
     $request = AccountRequest::factory()->create();
 
@@ -77,4 +78,37 @@ it('sorts the pending requests first, then the most recent ones', function () {
 
     expect(app(AccountRequestReviewService::class)->pendingFirst()->pluck('id')->all())
         ->toBe([$d->id, $b->id, $a->id, $c->id]);
+});
+
+it('turns an email taken since the validation into a validation error on the email', function () {
+    $request = AccountRequest::factory()->create();
+    User::factory()->create(['email' => 'paul@example.com']);
+    $userCount = User::query()->count();
+
+    $errors = null;
+    try {
+        app(AccountRequestReviewService::class)->createAccount($request, [
+            'name' => 'Paul Martin',
+            'email' => 'paul@example.com',
+            'role' => 'user',
+        ]);
+    } catch (ValidationException $exception) {
+        $errors = $exception->errors();
+    }
+
+    expect($errors)->toBe(['email' => ['La valeur du champ adresse e-mail est déjà utilisée.']]);
+
+    expect(User::query()->count())->toBe($userCount)
+        ->and($request->fresh()?->status)->toBe(AccountRequestStatus::Pending);
+    Notification::assertNothingSent();
+});
+
+it('creates the account with a password still to be set', function () {
+    $user = app(AccountRequestReviewService::class)->createAccount(AccountRequest::factory()->create(), [
+        'name' => 'Paul Martin',
+        'email' => 'paul@example.com',
+        'role' => 'user',
+    ]);
+
+    expect($user->fresh()?->password_set_at)->toBeNull();
 });
