@@ -6,6 +6,8 @@ $guestRoutes = [
     'password.request',
     'password.email',
     'password.update',
+    'account-request.create',
+    'account-request.store',
 ];
 
 $authenticatedRoutes = [

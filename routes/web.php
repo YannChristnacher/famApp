@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\AccountRequestController;
 use App\Http\Controllers\Auth\AuthPageController;
 use App\Http\Controllers\Core\HomeController;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +26,13 @@ Route::middleware('guest')->group(function () {
     Route::post('/reset-password', [NewPasswordController::class, 'store'])
         ->middleware('throttle:password-reset')
         ->name('password.update');
+
+    Route::controller(AccountRequestController::class)->group(function () {
+        Route::get('/account-request', 'create')->name('account-request.create');
+        Route::post('/account-request', 'store')
+            ->middleware('throttle:account-request')
+            ->name('account-request.store');
+    });
 });
 
 Route::middleware('auth')->group(function () {
