@@ -69,3 +69,21 @@ Notes d'implémentation :
 - Le refus et la création relisent la demande sous `lockForUpdate` dans la transaction : un modèle périmé ne permet pas de traiter deux fois (testé).
 - Tests existants ajustés (aucun retiré) : `registry.test.ts` (nouvelle entrée), `DashboardLayout.roles.test.ts` (l'entrée réelle s'ajoute à l'entrée simulée), `AccountRequestedNotificationTest` (nouveau bouton).
 - Parcours vérifié dans Chrome (environnement `e2e`, script Playwright jetable non commité) : connexion admin, entrée de menu, liste, formulaire prérempli, création avec email en majuscules, toast de succès, statut « Acceptée », email de bienvenue dans le log avec lien `reset-password` pour `paul.martin@example.com`.
+
+## Relecture (2026-11-16)
+Relecteur indépendant : aucun point bloquant. Points corrigés sur la même branche :
+
+1. **Lien de bienvenue valable 7 jours** (décision de l'orchestrateur, remplace l'hypothèse « 60 minutes » ci-dessus). Solution retenue : **URL signée temporaire** (`URL::temporarySignedRoute('invitation.show', …)`), durée `config('famapp.invitation_expire_days')` (7 par défaut, `FAMAPP_INVITATION_EXPIRE_DAYS`), valable seulement tant que `users.password_set_at` est nul : usage unique de fait.
+   - Pourquoi plutôt qu'un broker `invitations` : aucune table ni broker de plus, aucune interaction avec la table `password_reset_tokens` ni avec Fortify (le lien « mot de passe oublié » garde ses 60 minutes, testé) ; la signature (clé de l'application) protège l'identifiant et l'expiration.
+   - Migration `add_password_set_at_to_users_table` (comptes existants remplis) ; le seeder admin, la réinitialisation Fortify (`ResetUserPassword`) et la page d'invitation remplissent la colonne : un membre qui passe par « Mot de passe oublié » rend aussi l'invitation caduque.
+   - Routes invité `invitation.show` / `invitation.store` (`/invitation/{user}`, limiteur `password-reset`), middleware `EnsureInvitationIsUsable` (alias `invitation`) : signature invalide ou expirée → page `Auth/InvitationInvalid` (403) « Ce lien … a expiré ou n'est pas valide. Utilisez « Mot de passe oublié »… » avec boutons « Mot de passe oublié » et « Se connecter » ; mot de passe déjà défini → même page, message « Votre mot de passe a déjà été défini… ».
+   - Page `Auth/SetPassword` (« Définir mon mot de passe », même style que la réinitialisation), qui poste vers la même URL signée ; `InvitationService::setFirstPassword()` relit le compte sous verrou ; succès → connexion avec « Votre mot de passe est défini. Vous pouvez maintenant vous connecter. ».
+   - Email : « Ce lien est valable 7 jours. Passé ce délai, utilisez « Mot de passe oublié »… ».
+   - Tests : valide après 6 jours, refusé après 7 jours + 1 minute, durée configurable, lien altéré refusé, usage unique (GET et POST), refus après réinitialisation par « Mot de passe oublié », parcours complet jusqu'à la connexion, lien « mot de passe oublié » refusé après 61 minutes.
+2. Email pris entre la validation et l'insertion : `UniqueConstraintViolationException` interceptée dans le service → `ValidationException` sur `email` (message de validation français), transaction annulée. Testé.
+3. `StoreAccountFromRequestRequest::authorize()` vérifie le Gate `admin` (défense en profondeur). Testé. C'est la seule Form Request admin.
+4. Rôle validé par `Rule::in(Role::assignableValues())`, la même liste que la prop `roles` du contrôleur. Testé.
+5. Bouton « Refuser » : `loading` sur la ligne en cours, tous les « Refuser » désactivés et second clic ignoré jusqu'à la fin de la requête. Testé (Vitest).
+6. `AccountRequestAccessTest` : statut et destination exacts pour chaque route admin.
+
+Parcours de l'invitation vérifié dans Chrome (environnement `e2e`) : page de bienvenue, enregistrement, message sur la page de connexion, lien réutilisé refusé avec le message clair.
