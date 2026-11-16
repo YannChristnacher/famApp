@@ -31,8 +31,9 @@ it('builds a French email with the name, the email and the message of the reques
 
     expect($mail->subject)->toBe('Nouvelle demande de compte famApp')
         ->and($mail->greeting)->toBe('Bonjour Marie Dupont,')
-        ->and($mail->actionText)->toBe('Ouvrir famApp')
-        ->and($mail->actionUrl)->toBe(route('home'))
+        ->and($mail->actionText)->toBe('Voir les demandes de compte')
+        ->and($mail->actionUrl)->toBe(route('admin.account-requests.index'))
+        ->and($rendered)->not->toContain('arrive bientôt')
         ->and($rendered)->toContain('Paul Martin')
         ->and($rendered)->toContain('paul@example.com')
         ->and($rendered)->toContain('Je suis le cousin de Marie.')
