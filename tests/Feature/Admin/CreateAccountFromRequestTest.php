@@ -2,6 +2,7 @@
 
 use App\Enums\AccountRequestStatus;
 use App\Enums\Role;
+use App\Http\Requests\Admin\StoreAccountFromRequestRequest;
 use App\Models\Auth\AccountRequest;
 use App\Models\User;
 use App\Notifications\Auth\SetPasswordNotification;
@@ -180,7 +181,7 @@ it('writes the validation errors in French', function () {
         ->assertSessionHasErrors([
             'name' => 'Le champ nom est obligatoire.',
             'email' => 'La valeur du champ adresse e-mail est déjà utilisée.',
-            'role' => 'Le champ rôle sélectionné est invalide.',
+            'role' => 'Le champ rôle est invalide.',
         ]);
 });
 
@@ -218,7 +219,7 @@ it('answers 404 for an unknown request', function () {
 });
 
 it('only lets an admin pass the account form request', function () {
-    $request = new App\Http\Requests\Admin\StoreAccountFromRequestRequest;
+    $request = new StoreAccountFromRequestRequest;
 
     $request->setUserResolver(fn () => User::factory()->admin()->make());
     expect($request->authorize())->toBeTrue();

@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AccountRequestAccountController;
 use App\Http\Controllers\Admin\AccountRequestController as AdminAccountRequestController;
 use App\Http\Controllers\Auth\AccountRequestController;
 use App\Http\Controllers\Auth\AuthPageController;
+use App\Http\Controllers\Auth\InvitationController;
 use App\Http\Controllers\Core\HomeController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
@@ -28,6 +29,14 @@ Route::middleware('guest')->group(function () {
     Route::post('/reset-password', [NewPasswordController::class, 'store'])
         ->middleware('throttle:password-reset')
         ->name('password.update');
+
+    // Signed link of the welcome email (SetPasswordNotification).
+    Route::middleware('invitation')->controller(InvitationController::class)->group(function () {
+        Route::get('/invitation/{user}', 'show')->name('invitation.show');
+        Route::post('/invitation/{user}', 'store')
+            ->middleware('throttle:password-reset')
+            ->name('invitation.store');
+    });
 
     Route::controller(AccountRequestController::class)->group(function () {
         Route::get('/account-request', 'create')->name('account-request.create');

@@ -24,7 +24,7 @@ class AccountRequestAccountController extends Controller
 
         return Inertia::render('Admin/AccountRequests/CreateAccount', [
             'accountRequest' => $accountRequest->only(['id', 'name', 'email', 'message']),
-            'roles' => [Role::User->value, Role::Admin->value],
+            'roles' => Role::assignableValues(),
         ]);
     }
 

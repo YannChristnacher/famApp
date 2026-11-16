@@ -3,9 +3,11 @@ import type { TableColumn } from '@nuxt/ui'
 import { route } from 'ziggy-js'
 import type { AccountRequestRow, AccountRequestStatus } from '@/types/admin'
 
-defineProps<{
+const props = withDefaults(defineProps<{
   accountRequests: AccountRequestRow[]
-}>()
+  /** Request whose rejection is being sent: every « Refuser » is blocked meanwhile. */
+  rejectingId?: number | null
+}>(), { rejectingId: null })
 
 const emit = defineEmits<{
   reject: [accountRequest: AccountRequestRow]
@@ -24,6 +26,12 @@ const statusBadges: Record<AccountRequestStatus, { label: string, color: 'warnin
   pending: { label: 'En attente', color: 'warning' },
   approved: { label: 'Acceptée', color: 'success' },
   rejected: { label: 'Refusée', color: 'neutral' },
+}
+
+function reject(accountRequest: AccountRequestRow): void {
+  if (props.rejectingId === null) {
+    emit('reject', accountRequest)
+  }
 }
 
 const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
@@ -76,7 +84,9 @@ function formatDate(isoDate: string | null): string {
           color="neutral"
           variant="outline"
           size="sm"
-          @click="emit('reject', row.original)"
+          :loading="props.rejectingId === row.original.id"
+          :disabled="props.rejectingId !== null"
+          @click="reject(row.original)"
         >
           Refuser
         </UButton>

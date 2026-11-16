@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Notifications\Auth\SetPasswordNotification;
+use App\Services\Auth\InvitationService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -164,4 +165,11 @@ it('keeps the invitation pages for guests only', function () {
     actingAs(User::factory()->create());
 
     get(invitationLink($user))->assertRedirect(route('home'));
+});
+
+it('does not overwrite a password set in the meantime', function () {
+    $user = User::factory()->create(['password' => 'deja-choisi']);
+
+    expect(app(InvitationService::class)->setFirstPassword($user, 'autre-mot-de-passe'))->toBeFalse()
+        ->and(Hash::check('deja-choisi', (string) $user->fresh()?->password))->toBeTrue();
 });

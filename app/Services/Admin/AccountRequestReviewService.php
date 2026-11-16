@@ -8,16 +8,14 @@ use App\Exceptions\Admin\AccountRequestAlreadyProcessedException;
 use App\Models\Auth\AccountRequest;
 use App\Models\User;
 use App\Notifications\Auth\SetPasswordNotification;
-use Illuminate\Contracts\Auth\PasswordBroker;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use RuntimeException;
+use Illuminate\Validation\ValidationException;
 
 class AccountRequestReviewService
 {
-    public function __construct(private readonly PasswordBroker $passwords) {}
-
     /**
      * Pending requests first, then the most recent ones.
      *
@@ -46,7 +44,7 @@ class AccountRequestReviewService
 
     /**
      * Creates the account with a random password nobody knows, approves the
-     * request and emails the new member a link to choose their password.
+     * request and emails the new member a signed link to choose their password.
      *
      * @param  array{name: string, email: string, role: string}  $data
      */
@@ -55,19 +53,13 @@ class AccountRequestReviewService
         return DB::transaction(function () use ($request, $data): User {
             $request = $this->lockPending($request);
 
-            $user = new User([
-                'name' => $data['name'],
-                'email' => $data['email'],
-                'password' => Str::random(64),
-            ]);
-            $user->role = Role::from($data['role']);
-            $user->save();
+            $user = $this->createInvitedUser($data);
 
             $request->status = AccountRequestStatus::Approved;
             $request->user()->associate($user);
             $request->save();
 
-            $this->sendSetPasswordLink($user);
+            $user->notify(new SetPasswordNotification);
 
             return $user;
         });
@@ -94,15 +86,30 @@ class AccountRequestReviewService
         return $locked;
     }
 
-    private function sendSetPasswordLink(User $user): void
+    /**
+     * The password is random and unknown: the member chooses theirs from the
+     * invitation link. The email may have been taken since the form was
+     * validated (two administrators at once): same error as the validation.
+     *
+     * @param  array{name: string, email: string, role: string}  $data
+     */
+    private function createInvitedUser(array $data): User
     {
-        $status = $this->passwords->sendResetLink(
-            ['email' => $user->email],
-            fn (User $user, string $token) => $user->notify(new SetPasswordNotification($token)),
-        );
+        $user = new User([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => Str::random(64),
+        ]);
+        $user->role = Role::from($data['role']);
 
-        if ($status !== PasswordBroker::RESET_LINK_SENT) {
-            throw new RuntimeException("The set password link could not be created ({$status}).");
+        try {
+            $user->save();
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages([
+                'email' => __('validation.unique', ['attribute' => __('validation.attributes.email')]),
+            ]);
         }
+
+        return $user;
     }
 }

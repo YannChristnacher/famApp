@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { router } from '@inertiajs/vue3'
 import { route } from 'ziggy-js'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
@@ -11,11 +12,21 @@ defineProps<{
 
 const breadcrumb = [{ label: 'Administration' }, { label: 'Demandes de compte' }]
 
+const rejectingId = ref<number | null>(null)
+
 function reject(accountRequest: AccountRequestRow): void {
+  if (rejectingId.value !== null) {
+    return
+  }
+
   router.post(
     route('admin.account-requests.reject', { accountRequest: accountRequest.id }, false),
     {},
-    { preserveScroll: true },
+    {
+      preserveScroll: true,
+      onStart: () => { rejectingId.value = accountRequest.id },
+      onFinish: () => { rejectingId.value = null },
+    },
   )
 }
 </script>
@@ -27,6 +38,7 @@ function reject(accountRequest: AccountRequestRow): void {
   >
     <AccountRequestsTable
       :account-requests="accountRequests"
+      :rejecting-id="rejectingId"
       @reject="reject"
     />
   </DashboardLayout>

@@ -17,6 +17,7 @@ class AdminAccountService
         $email = Str::lower(trim($email));
         $user = User::query()->where('email', $email)->first()
             ?? new User(['name' => $name, 'email' => $email, 'password' => $password]);
+        $user->password_set_at ??= now();
 
         $user->role = Role::Admin;
         $user->save();

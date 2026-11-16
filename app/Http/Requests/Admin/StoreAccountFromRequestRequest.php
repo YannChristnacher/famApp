@@ -7,28 +7,28 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Rules\In;
 use Illuminate\Validation\Rules\Unique;
 
 class StoreAccountFromRequestRequest extends FormRequest
 {
     /**
-     * Access is limited to administrators by the route (Gate "admin").
+     * The route is already limited to administrators; checked again here.
      */
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('admin') ?? false;
     }
 
     /**
-     * @return array<string, array<int, string|ValidationRule|Enum|Unique>>
+     * @return array<string, array<int, string|ValidationRule|In|Unique>>
      */
     public function rules(): array
     {
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')],
-            'role' => ['required', Rule::enum(Role::class)],
+            'role' => ['required', Rule::in(Role::assignableValues())],
         ];
     }
 

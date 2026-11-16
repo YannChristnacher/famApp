@@ -10,9 +10,11 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 
 /**
  * @property Role $role
+ * @property Carbon|null $password_set_at
  */
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
@@ -38,8 +40,18 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'password_set_at' => 'datetime',
             'role' => Role::class,
         ];
+    }
+
+    /**
+     * False for a member created by an administrator who has not chosen a
+     * password yet: only then may the invitation link be used.
+     */
+    public function hasSetPassword(): bool
+    {
+        return $this->password_set_at !== null;
     }
 
     public function isAdmin(): bool

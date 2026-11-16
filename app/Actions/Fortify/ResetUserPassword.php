@@ -25,8 +25,10 @@ class ResetUserPassword implements ResetsUserPasswords
             'password' => $this->passwordRules(),
         ])->validate();
 
+        // Choosing a password this way also ends a pending invitation.
         $user->forceFill([
             'password' => Hash::make($input['password']),
+            'password_set_at' => $user->password_set_at ?? now(),
         ])->save();
     }
 }
