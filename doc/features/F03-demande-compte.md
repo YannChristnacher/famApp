@@ -48,7 +48,7 @@ Hypothèses :
 ## Status
 - Branch: feature/F03-demande-compte
 - Tests written: yes (tests/Feature/Auth/AccountRequestTest.php, tests/Feature/Auth/AccountRequestServiceTest.php, tests/Unit/Auth/AccountRequestedNotificationTest.php, tests/Feature/Core/HomeTest.php, resources/js/pages/Auth/RequestAccount.test.ts, resources/js/pages/Auth/Login.test.ts)
-- Tests passing: yes en local (composer test, composer lint, npm run test, npm run lint, npm run build) ; AC15 à confirmer par la CI de la PR.
+- Tests passing: yes en local (composer test, composer lint, npm run test, npm run lint, npm run build)  ; AC15 confirmé par la CI de la PR #4 (jobs backend, frontend, docker, e2e verts).
 
 Notes d'implémentation :
 - `UAuthForm` n'a pas de type de champ textarea et le slot dynamique `#message-field` est mal typé par Nuxt UI (collision avec les slots `-label`/`-hint`…, props `{}`) : le `UTextarea` est lié directement au `useForm` d'Inertia (`form.message`), `UAuthForm` ne porte que le nom et l'email.
