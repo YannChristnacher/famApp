@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -37,7 +38,29 @@ class HandleInertiaRequests extends Middleware
     {
         return [
             ...parent::share($request),
-            //
+            'auth' => [
+                'user' => fn () => $this->sharedUser($request->user()),
+            ],
+            'status' => fn () => $request->session()->get('status'),
+        ];
+    }
+
+    /**
+     * Only what the front end needs: never the password hash or tokens.
+     *
+     * @return array{id: int, name: string, email: string, role: string}|null
+     */
+    private function sharedUser(?User $user): ?array
+    {
+        if ($user === null) {
+            return null;
+        }
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role->value,
         ];
     }
 }

@@ -20,6 +20,8 @@
   "include": [
     "resources/js/**/*.ts",
     "resources/js/**/*.vue",
+    "tests/e2e/**/*.ts",
+    "playwright.config.ts",
     "auto-imports.d.ts",
     "components.d.ts"
   ],

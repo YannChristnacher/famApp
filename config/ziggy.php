@@ -1,5 +1,18 @@
 <?php
 
+$guestRoutes = [
+    'login',
+    'login.store',
+    'password.request',
+    'password.email',
+    'password.update',
+];
+
+$authenticatedRoutes = [
+    'home',
+    'logout',
+];
+
 return [
 
     /*
@@ -9,12 +22,18 @@ return [
     'skip-route-function' => true,
 
     /*
-    | Allowlist of the named routes printed in every page by @routes, guests
-    | included. Any route used by the front end must be added here explicitly;
-    | never expose admin routes to pages visitors can reach.
+    | Allowlist of the named routes the front end may use. Any route used by the
+    | front end must be added here explicitly; never expose admin routes.
     */
-    'only' => [
-        'home',
+    'only' => [...$guestRoutes, ...$authenticatedRoutes],
+
+    /*
+    | The allowlist is split by authentication state: app.blade.php prints the
+    | "guest" group to visitors and the "auth" group to signed-in users.
+    */
+    'groups' => [
+        'guest' => $guestRoutes,
+        'auth' => $authenticatedRoutes,
     ],
 
 ];
