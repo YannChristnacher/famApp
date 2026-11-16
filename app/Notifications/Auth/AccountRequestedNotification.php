@@ -40,8 +40,8 @@ class AccountRequestedNotification extends Notification implements ShouldQueue
             ->line($this->literal($requester->name, prefix: 'Nom : '))
             ->line($this->literal($requester->email, prefix: 'Adresse email : '))
             ->line($this->messageLine($requester->message))
-            ->action('Ouvrir famApp', route('home'))
-            ->line('La gestion des demandes depuis l\'application arrive bientôt : en attendant, vous pouvez répondre directement au demandeur par email.')
+            ->action('Voir les demandes de compte', route('admin.account-requests.index'))
+            ->line('Depuis cette page, vous pouvez créer son compte ou refuser la demande.')
             ->salutation('À bientôt sur famApp');
     }
 

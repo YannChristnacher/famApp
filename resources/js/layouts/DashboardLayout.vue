@@ -5,6 +5,7 @@ import type { BreadcrumbItem } from '@nuxt/ui'
 import { route } from 'ziggy-js'
 import { filterEntriesByRoles, isActiveUrl, navigationRegistry, toNavigationMenuItems } from '@/navigation/registry'
 import { useAuth } from '@/composables/useAuth'
+import { useFlashToasts } from '@/composables/useFlashToasts'
 import UserMenu from '@/components/Auth/UserMenu.vue'
 
 defineProps<{
@@ -13,6 +14,7 @@ defineProps<{
 }>()
 
 const { roles } = useAuth()
+useFlashToasts()
 const page = usePage()
 const relativeUrl = (name: string) => route(name, undefined, false)
 
