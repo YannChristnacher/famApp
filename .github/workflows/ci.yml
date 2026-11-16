@@ -55,3 +55,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build --target prod -f docker/php/Dockerfile -t famapp:ci .
+
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      ADMIN_EMAIL: admin@famapp.test
+      ADMIN_PASSWORD: mot-de-passe-e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pdo_sqlite, intl, zip, gd, exif, bcmath
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: composer install --no-interaction --no-progress --prefer-dist
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: scripts/prepare-e2e.sh
+      - run: npx playwright test
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+            storage/logs/
+          retention-days: 7

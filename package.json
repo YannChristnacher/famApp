@@ -8,10 +8,12 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "lint": "eslint . && vue-tsc --noEmit",
-        "lint:fix": "eslint . --fix"
+        "lint:fix": "eslint . --fix",
+        "test:e2e": "playwright test"
     },
     "devDependencies": {
         "@iconify-json/lucide": "^1.2.155",
+        "@playwright/test": "^1.65.1",
         "@tailwindcss/vite": "^4.0.0",
         "@types/node": "^26.6.6",
         "@vitejs/plugin-vue": "^6.0.11",
