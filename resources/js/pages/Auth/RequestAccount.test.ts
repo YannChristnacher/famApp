@@ -76,4 +76,22 @@ describe('Auth/RequestAccount', () => {
     })
     expect(wrapper.text()).toContain('Le texte de message ne peut contenir plus de 2000 caractères.')
   })
+
+  it('keeps everything that was typed when the request is refused', async () => {
+    vi.spyOn(router, 'post').mockImplementation((_url, _data, options?: VisitOptions) => {
+      options?.onError?.({ email: 'Trop de demandes envoyées. Veuillez réessayer plus tard.' })
+      options?.onFinish?.({} as never)
+    })
+    const wrapper = await mountWithUi(RequestAccount)
+
+    await wrapper.find('input[name="name"]').setValue('Paul Martin')
+    await wrapper.find('input[name="email"]').setValue('paul@example.com')
+    await wrapper.find('textarea[name="message"]').setValue('Je suis le cousin de Marie.')
+    await wrapper.find('form').trigger('submit')
+
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Trop de demandes envoyées. Veuillez réessayer plus tard.'))
+    expect((wrapper.find('input[name="name"]').element as HTMLInputElement).value).toBe('Paul Martin')
+    expect((wrapper.find('input[name="email"]').element as HTMLInputElement).value).toBe('paul@example.com')
+    expect((wrapper.find('textarea[name="message"]').element as HTMLTextAreaElement).value).toBe('Je suis le cousin de Marie.')
+  })
 })

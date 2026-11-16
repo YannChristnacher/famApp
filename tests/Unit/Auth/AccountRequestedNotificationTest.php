@@ -54,6 +54,13 @@ it('does not render the Markdown typed by the requester', function () {
         ->and($rendered)->toContain('Cliquez ici');
 });
 
+it('removes the invisible Unicode format characters typed by the requester', function () {
+    $rendered = accountRequestMail("Paul\u{202E}nitraM\u{200B} \u{2066}ici\u{2069}\u{FEFF}");
+
+    expect($rendered)->toContain('Message : PaulnitraM ici')
+        ->and($rendered)->not->toMatch('/\p{Cf}/u');
+});
+
 it('does not render the HTML typed by the requester', function () {
     $rendered = accountRequestMail('<a href="https://pirate.example">ici</a> <img src=x>');
 
