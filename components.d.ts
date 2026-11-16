@@ -11,7 +11,16 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
-    UApp: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/App.vue')['default']
+    UBreadcrumb: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/Breadcrumb.vue')['default']
     UCard: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/Card.vue')['default']
+    UDashboardGroup: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/DashboardGroup.vue')['default']
+    UDashboardNavbar: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/DashboardNavbar.vue')['default']
+    UDashboardPanel: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/DashboardPanel.vue')['default']
+    UDashboardSearch: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/DashboardSearch.vue')['default']
+    UDashboardSearchButton: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/DashboardSearchButton.vue')['default']
+    UDashboardSidebar: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/DashboardSidebar.vue')['default']
+    UDashboardSidebarCollapse: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/DashboardSidebarCollapse.vue')['default']
+    UDashboardToolbar: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/DashboardToolbar.vue')['default']
+    UNavigationMenu: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/NavigationMenu.vue')['default']
   }
 }

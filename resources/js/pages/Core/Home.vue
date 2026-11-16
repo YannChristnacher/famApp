@@ -1,23 +1,25 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3'
+import DashboardLayout from '@/layouts/DashboardLayout.vue'
 
 defineProps<{
   appName: string
 }>()
+
+const breadcrumb = [{ label: 'Accueil' }]
 </script>
 
 <template>
-  <UApp>
-    <Head title="Accueil" />
-    <main class="flex min-h-screen items-center justify-center p-6">
-      <UCard class="w-full max-w-md text-center">
-        <h1 class="text-2xl font-semibold">
-          {{ appName }}
-        </h1>
-        <p class="mt-2 text-muted">
-          Les livres et les outils de la famille, au même endroit.
-        </p>
-      </UCard>
-    </main>
-  </UApp>
+  <DashboardLayout
+    title="Accueil"
+    :breadcrumb="breadcrumb"
+  >
+    <UCard class="mx-auto w-full max-w-2xl">
+      <h2 class="text-xl font-semibold text-highlighted">
+        Bienvenue sur {{ appName }}
+      </h2>
+      <p class="mt-2 text-muted">
+        Les livres et les outils de la famille, au même endroit.
+      </p>
+    </UCard>
+  </DashboardLayout>
 </template>
