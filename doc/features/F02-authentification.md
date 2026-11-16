@@ -26,8 +26,8 @@ Réserver famApp aux membres de la famille : connexion par email et mot de passe
 - [x] AC15 (Vitest): Given `auth.user` partagé avec le rôle `user`, when le layout est rendu, then les entrées exigeant `admin` sont masquées ; avec le rôle `admin`, then elles sont visibles.
 - [x] AC16 (Vitest): Given le menu utilisateur en pied de sidebar, when il est rendu, then il affiche le nom de l'utilisateur ; when on choisit « Se déconnecter », then un `POST` vers `logout` est envoyé.
 - [x] AC17 (Vitest): Given la page `Auth/Login`, when elle est rendue, then elle affiche un `UAuthForm` en français (email, mot de passe, « Se souvenir de moi », lien « Mot de passe oublié ? ») et les erreurs serveur sous le champ email.
-- [ ] AC18 (Playwright, CI): Given l'admin seedé, when il se connecte avec le bon mot de passe, then il arrive sur l'accueil ; with un mauvais mot de passe, then le message d'erreur français s'affiche.
-- [ ] AC19: Given le code, when on lance `composer test`, `composer lint`, `npm run test`, `npm run lint`, `npm run build`, then tout passe, et la CI (dont le job `e2e`) est verte.
+- [x] AC18 (Playwright, CI): Given l'admin seedé, when il se connecte avec le bon mot de passe, then il arrive sur l'accueil ; with un mauvais mot de passe, then le message d'erreur français s'affiche.
+- [x] AC19: Given le code, when on lance `composer test`, `composer lint`, `npm run test`, `npm run lint`, `npm run build`, then tout passe, et la CI (dont le job `e2e`) est verte.
 
 ## Technical approach
 1. **Fortify** (`laravel/fortify`) : `config/fortify.php` avec `features` = `resetPasswords()` seulement, `views` = `false`, `home` = `/`, `limiters.login` = `null` (verrouillage intégré de Fortify : 5 échecs par email + IP, message français `auth.throttle` sous le champ email, au lieu d'un 429 brut du middleware `throttle`). `App\Providers\FortifyServiceProvider` : action `ResetUserPassword`, réponses personnalisées :
@@ -53,7 +53,7 @@ Hypothèses :
 ## Status
 - Branch: feature/F02-authentification
 - Tests written: yes (tests/Feature/Auth/*, tests/Unit/Auth/ResetPasswordNotificationTest.php, tests/Feature/Core/HomeTest.php, resources/js/composables/useAuth.test.ts, resources/js/components/Auth/UserMenu.test.ts, resources/js/layouts/DashboardLayout.roles.test.ts, resources/js/pages/Auth/*.test.ts, tests/e2e/login.spec.ts)
-- Tests passing: yes en local (composer test, composer lint, npm run test, npm run lint, npm run build) ; Playwright passé en local avec le Chrome du système (`PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/google-chrome`), le téléchargement des navigateurs Playwright étant bloqué ; AC18-AC19 à confirmer par la CI de la PR.
+- Tests passing: yes en local (composer test, composer lint, npm run test, npm run lint, npm run build) ; Playwright passé en local avec le Chrome du système (`PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/google-chrome`), le téléchargement des navigateurs Playwright étant bloqué ; AC18-AC19 confirmés par la CI de la PR #3 (jobs backend, frontend, docker, e2e verts).
 
 Notes d'implémentation :
 - Les emails de notification de Laravel contenaient des textes anglais (« Hello! », « Regards, », « If you're having trouble… », « All rights reserved. ») : les gabarits `resources/views/vendor/notifications/email.blade.php` et `resources/views/vendor/mail/{html,text}/message.blade.php` sont publiés avec ces textes en français en dur (pas de fichier de traduction) ; ils serviront aussi aux emails de F03/F04.
