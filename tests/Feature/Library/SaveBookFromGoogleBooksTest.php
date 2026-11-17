@@ -15,6 +15,7 @@ use function Pest\Laravel\post;
 const GOOGLE_VOLUME_URL = 'www.googleapis.com/books/v1/volumes/zyTCAlFPjgYC*';
 const GOOGLE_THUMBNAIL = 'books.google.com/books/content*';
 
+// toEqual on the raw data: MySQL stores JSON objects with their keys reordered.
 beforeEach(function () {
     Storage::fake('public');
     Http::preventStrayRequests();
@@ -61,7 +62,7 @@ it('stores the raw data fetched by the server and the downloaded cover', functio
     $book = Book::query()->sole();
     expect($book->user_id)->toBe($user->id)
         ->and($book->title)->toBe('Le Hobbit (corrigé)')
-        ->and($book->google_books_data)->toBe(googleVolume('zyTCAlFPjgYC'))
+        ->and($book->google_books_data)->toEqual(googleVolume('zyTCAlFPjgYC'))
         ->and($book->cover_path)->toStartWith('covers/')
         ->and(storedImage((string) $book->cover_path))->toBe([800, 1200, 'mime' => 'image/jpeg']);
 
@@ -79,7 +80,7 @@ it('reuses the volume cached by the lookup instead of calling Google again', fun
 
     post(route('library.books.store'), googleBookForm(['use_google_cover' => false]))->assertSessionHasNoErrors();
 
-    expect(Book::query()->sole()->google_books_data)->toBe(googleVolume('zyTCAlFPjgYC'))
+    expect(Book::query()->sole()->google_books_data)->toEqual(googleVolume('zyTCAlFPjgYC'))
         ->and(Book::query()->sole()->cover_path)->toBeNull();
     Http::assertSentCount(1);
 });
@@ -155,7 +156,7 @@ it('replaces the raw data and the cover of an edited book', function () {
         ->assertInertiaFlash('toast', ['type' => 'success', 'message' => 'Le livre « Le Hobbit » a été modifié.']);
 
     $book->refresh();
-    expect($book->google_books_data)->toBe(googleVolume('zyTCAlFPjgYC'))
+    expect($book->google_books_data)->toEqual(googleVolume('zyTCAlFPjgYC'))
         ->and($book->cover_path)->not->toBe('covers/old.jpg')
         ->and(storedImage((string) $book->cover_path))->toBe([800, 1200, 'mime' => 'image/jpeg']);
     Storage::disk('public')->assertMissing('covers/old.jpg');
@@ -193,7 +194,7 @@ it('keeps the raw data of a book edited by hand', function () {
         'google_books_data' => ['forged' => true],
     ])->assertSessionHasNoErrors();
 
-    expect($book->refresh()->google_books_data)->toBe(googleVolume())
+    expect($book->refresh()->google_books_data)->toEqual(googleVolume())
         ->and($book->cover_path)->toBeNull();
     Http::assertNothingSent();
 });
