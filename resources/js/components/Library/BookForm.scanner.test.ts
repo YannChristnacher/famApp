@@ -5,7 +5,10 @@ import { createBookBarcodeDetector } from '@/support/library/barcodeDetector'
 import type { Book, GoogleBooksLookup } from '@/types/library'
 import BookForm from './BookForm.vue'
 
-vi.mock('@/support/library/barcodeDetector', () => ({ createBookBarcodeDetector: vi.fn() }))
+vi.mock('@/support/library/barcodeDetector', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/support/library/barcodeDetector')>()),
+  createBookBarcodeDetector: vi.fn(),
+}))
 
 const SCANNED = '9782070368228'
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, shallowRef, toRaw, watch } from 'vue'
 import { bookIsbnFromBarcode } from '@/support/library/bookBarcode'
-import { createBookBarcodeDetector } from '@/support/library/barcodeDetector'
+import { createBookBarcodeDetector, isDetectorUnavailable } from '@/support/library/barcodeDetector'
 import type { BookBarcodeDetector, DetectedBarcode } from '@/support/library/barcodeDetector'
 
 const open = defineModel<boolean>('open', { required: true })
@@ -45,6 +45,23 @@ function detector(): Promise<BookBarcodeDetector | null> {
   })
 
   return detectorPromise
+}
+
+/** The barcodes read on the source, or null when the detector is unavailable. */
+async function detectOn(reader: BookBarcodeDetector, source: ImageBitmapSource): Promise<DetectedBarcode[] | null> {
+  try {
+    return await reader.detect(source)
+  } catch (cause) {
+    // Other failures are transient (video not ready yet) or tied to one photo.
+    return isDetectorUnavailable(cause) ? null : []
+  }
+}
+
+function failReader(): void {
+  stopCamera()
+  detectorPromise = null
+  notice.value = null
+  error.value = READER_FAILED
 }
 
 function cameraErrorMessage(cause: unknown): string {
@@ -120,8 +137,7 @@ async function startCamera(): Promise<void> {
   }
   starting.value = false
   if (loaded === null) {
-    stopCamera()
-    error.value = READER_FAILED
+    failReader()
 
     return
   }
@@ -135,8 +151,16 @@ function scheduleScan(current: number, reader: BookBarcodeDetector): void {
       return
     }
 
-    const codes = video.value === null ? [] : await reader.detect(video.value).catch(() => [])
-    if (current !== session || accepts(codes)) {
+    const codes = video.value === null ? [] : await detectOn(reader, video.value)
+    if (current !== session) {
+      return
+    }
+    if (codes === null) {
+      failReader()
+
+      return
+    }
+    if (accepts(codes)) {
       return
     }
 
@@ -164,22 +188,34 @@ function accepts(codes: DetectedBarcode[]): boolean {
 }
 
 async function decodePhoto(file: File): Promise<void> {
+  const current = session
   decodingPhoto.value = true
   notice.value = null
 
   try {
     const reader = await detector()
+    if (current !== session) {
+      return
+    }
     if (reader === null) {
-      error.value = READER_FAILED
+      failReader()
 
       return
     }
 
-    const codes = await reader.detect(file).catch(() => [])
-    if (!open.value || accepts(codes)) {
+    const codes = await detectOn(reader, file)
+    // Closed (or closed and reopened) meanwhile: this photo belongs to another session.
+    if (current !== session || !open.value) {
       return
     }
-    notice.value = codes.length === 0 ? NOTHING_ON_PHOTO : NOT_A_BOOK
+    if (codes === null) {
+      failReader()
+
+      return
+    }
+    if (!accepts(codes)) {
+      notice.value = codes.length === 0 ? NOTHING_ON_PHOTO : NOT_A_BOOK
+    }
   } finally {
     decodingPhoto.value = false
   }

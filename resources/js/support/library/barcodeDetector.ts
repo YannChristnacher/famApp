@@ -32,18 +32,37 @@ async function nativeDetector(): Promise<BookBarcodeDetector | null> {
 /**
  * The polyfill (zxing-cpp in WebAssembly), loaded on demand. Its WebAssembly
  * file is served by our build: the library would fetch it from jsDelivr otherwise.
+ * The module is loaded before the detector is created, because the polyfill's
+ * constructor swallows a loading failure (each detect() would then reject).
  */
 async function polyfillDetector(): Promise<BookBarcodeDetector> {
-  const [{ BarcodeDetector, setZXingModuleOverrides }, { default: wasmUrl }] = await Promise.all([
+  const [{ BarcodeDetector, prepareZXingModule, purgeZXingModule }, { default: wasmUrl }] = await Promise.all([
     import('barcode-detector/ponyfill'),
     import('zxing-wasm/reader/zxing_reader.wasm?url'),
   ])
 
-  setZXingModuleOverrides({
-    locateFile: (path: string, prefix: string) => (path.endsWith('.wasm') ? wasmUrl : prefix + path),
-  })
+  try {
+    await prepareZXingModule({
+      overrides: {
+        locateFile: (path: string, prefix: string) => (path.endsWith('.wasm') ? wasmUrl : prefix + path),
+      },
+      fireImmediately: true,
+    })
+  } catch (cause) {
+    // Forgets the failed module, so that the next attempt loads it again.
+    purgeZXingModule()
+    throw cause
+  }
 
   return new BarcodeDetector({ formats: FORMATS })
+}
+
+/**
+ * A detect() failure that will not go away by retrying: the polyfill rejects
+ * with NotSupportedError when its WebAssembly module is unavailable.
+ */
+export function isDetectorUnavailable(cause: unknown): boolean {
+  return cause instanceof DOMException && cause.name === 'NotSupportedError'
 }
 
 /** A detector of EAN-13 barcodes: the browser's own when it has one, else the polyfill. */

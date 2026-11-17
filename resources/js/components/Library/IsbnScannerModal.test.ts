@@ -6,7 +6,10 @@ import { createBookBarcodeDetector } from '@/support/library/barcodeDetector'
 import type { DetectedBarcode } from '@/support/library/barcodeDetector'
 import IsbnScannerModal from './IsbnScannerModal.vue'
 
-vi.mock('@/support/library/barcodeDetector', () => ({ createBookBarcodeDetector: vi.fn() }))
+vi.mock('@/support/library/barcodeDetector', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/support/library/barcodeDetector')>()),
+  createBookBarcodeDetector: vi.fn(),
+}))
 
 const BOOK = '9782070368228'
 const NOT_A_BOOK = '3017620422003'
@@ -42,6 +45,10 @@ function stubCamera(getUserMedia: () => Promise<MediaStream>) {
   Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia: spy }, configurable: true })
 
   return spy
+}
+
+function unavailableDetector(): DOMException {
+  return new DOMException('Barcode detection service unavailable.', 'NotSupportedError')
 }
 
 function cameraError(name: string): DOMException {
@@ -205,6 +212,49 @@ describe('Library/IsbnScannerModal', () => {
     expect(detected).not.toHaveBeenCalled()
   })
 
+  it('stops the camera and explains when the detector turns out to be unavailable', async () => {
+    const { detect } = stubDetector()
+    detect.mockRejectedValue(unavailableDetector())
+    const { stream, tracks } = fakeStream()
+    stubCamera(() => Promise.resolve(stream))
+
+    await mountScanner()
+
+    await vi.waitFor(() => expect(bodyText()).toContain('Le lecteur de code-barres n’a pas pu se charger'))
+    tracks.forEach((track) => expect(track.stop).toHaveBeenCalled())
+    const calls = detect.mock.calls.length
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    expect(detect.mock.calls.length).toBe(calls)
+    expect(detected).not.toHaveBeenCalled()
+  })
+
+  it('loads the detector again when reopened after it failed', async () => {
+    const { detect } = stubDetector()
+    detect.mockRejectedValue(unavailableDetector())
+    stubCamera(() => Promise.resolve(fakeStream().stream))
+    await mountScanner()
+    await vi.waitFor(() => expect(bodyText()).toContain('Le lecteur de code-barres n’a pas pu se charger'))
+
+    open.value = false
+    await flushPromises()
+    open.value = true
+    await flushPromises()
+
+    expect(createBookBarcodeDetector).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps scanning while the video is not ready yet', async () => {
+    const { detect } = stubDetector()
+    detect
+      .mockRejectedValueOnce(new DOMException('Invalid element or state.', 'InvalidStateError'))
+      .mockResolvedValueOnce([{ rawValue: BOOK }])
+    stubCamera(() => Promise.resolve(fakeStream().stream))
+
+    await mountScanner()
+
+    await vi.waitFor(() => expect(detected).toHaveBeenCalledExactlyOnceWith(BOOK))
+  })
+
   it('stops every track and stops scanning when the modal is closed', async () => {
     const { detect } = stubDetector()
     const { stream, tracks } = fakeStream()
@@ -329,6 +379,36 @@ describe('Library/IsbnScannerModal', () => {
 
       await vi.waitFor(() => expect(bodyText()).toContain('Aucun code-barres lisible sur cette photo'))
       expect(detected).not.toHaveBeenCalled()
+    })
+
+    it('explains that the reader is unavailable instead of blaming the photo', async () => {
+      const { detect } = stubDetector()
+      await mountScanner()
+      detect.mockRejectedValue(unavailableDetector())
+
+      await choosePhoto(new File(['jpeg'], 'code.jpg', { type: 'image/jpeg' }))
+
+      await vi.waitFor(() => expect(bodyText()).toContain('Le lecteur de code-barres n’a pas pu se charger'))
+      expect(bodyText()).not.toContain('Aucun code-barres lisible')
+      expect(detected).not.toHaveBeenCalled()
+    })
+
+    it('ignores a photo decoded after the modal was closed and reopened', async () => {
+      const { detect } = stubDetector()
+      await mountScanner()
+      let answer: (codes: DetectedBarcode[]) => void = () => {}
+      detect.mockImplementationOnce(() => new Promise((resolve) => { answer = resolve }))
+
+      await choosePhoto(new File(['jpeg'], 'code.jpg', { type: 'image/jpeg' }))
+      open.value = false
+      await flushPromises()
+      open.value = true
+      await flushPromises()
+      answer([{ rawValue: BOOK }])
+      await flushPromises()
+
+      expect(detected).not.toHaveBeenCalled()
+      expect(open.value).toBe(true)
     })
 
     it('explains when the photo cannot be decoded', async () => {

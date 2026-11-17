@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const ponyfill = vi.hoisted(() => ({
   constructed: [] as unknown[],
   construct: vi.fn(),
-  setZXingModuleOverrides: vi.fn(),
+  prepareZXingModule: vi.fn((options: unknown) => { void options; return Promise.resolve({}) }),
+  purgeZXingModule: vi.fn(),
 }))
 
 vi.mock('barcode-detector/ponyfill', () => ({
@@ -17,7 +18,8 @@ vi.mock('barcode-detector/ponyfill', () => ({
       return Promise.resolve([{ rawValue: 'from-ponyfill' }])
     }
   },
-  setZXingModuleOverrides: ponyfill.setZXingModuleOverrides,
+  prepareZXingModule: ponyfill.prepareZXingModule,
+  purgeZXingModule: ponyfill.purgeZXingModule,
 }))
 
 vi.mock('zxing-wasm/reader/zxing_reader.wasm?url', () => ({ default: '/build/assets/zxing_reader-abc123.wasm' }))
@@ -50,7 +52,8 @@ describe('createBookBarcodeDetector', () => {
   beforeEach(() => {
     ponyfill.constructed.length = 0
     ponyfill.construct.mockClear()
-    ponyfill.setZXingModuleOverrides.mockClear()
+    ponyfill.prepareZXingModule.mockClear()
+    ponyfill.purgeZXingModule.mockClear()
   })
 
   afterEach(() => {
@@ -65,7 +68,7 @@ describe('createBookBarcodeDetector', () => {
     expect(constructed).toEqual([{ formats: ['ean_13'] }])
     await expect(detector.detect(new Blob())).resolves.toEqual([{ rawValue: 'from-native' }])
     expect(ponyfill.constructed).toEqual([])
-    expect(ponyfill.setZXingModuleOverrides).not.toHaveBeenCalled()
+    expect(ponyfill.prepareZXingModule).not.toHaveBeenCalled()
   })
 
   it('falls back to the polyfill when the native detector cannot read EAN-13 codes', async () => {
@@ -86,18 +89,40 @@ describe('createBookBarcodeDetector', () => {
     expect(ponyfill.constructed).toEqual([{ formats: ['ean_13'] }])
   })
 
-  it('loads the WebAssembly file from our build, never from a CDN', async () => {
+  it('loads the WebAssembly file from our build, never from a CDN, before creating the detector', async () => {
     vi.stubGlobal('BarcodeDetector', undefined)
 
     await create()
 
-    expect(ponyfill.setZXingModuleOverrides).toHaveBeenCalledOnce()
-    const overrides = ponyfill.setZXingModuleOverrides.mock.lastCall![0] as {
-      locateFile: (path: string, prefix: string) => string
+    expect(ponyfill.prepareZXingModule).toHaveBeenCalledOnce()
+    const options = ponyfill.prepareZXingModule.mock.lastCall![0] as {
+      fireImmediately: boolean
+      overrides: { locateFile: (path: string, prefix: string) => string }
     }
-    expect(overrides.locateFile('zxing_reader.wasm', 'https://fastly.jsdelivr.net/npm/zxing-wasm/dist/reader/'))
+    expect(options.fireImmediately).toBe(true)
+    expect(options.overrides.locateFile('zxing_reader.wasm', 'https://fastly.jsdelivr.net/npm/zxing-wasm/dist/reader/'))
       .toBe('/build/assets/zxing_reader-abc123.wasm')
-    expect(ponyfill.setZXingModuleOverrides.mock.invocationCallOrder[0])
+    expect(ponyfill.prepareZXingModule.mock.invocationCallOrder[0])
       .toBeLessThan(ponyfill.construct.mock.invocationCallOrder[0]!)
+  })
+
+  it('fails when the WebAssembly file cannot be loaded, and allows a later retry', async () => {
+    vi.stubGlobal('BarcodeDetector', undefined)
+    ponyfill.prepareZXingModule.mockRejectedValueOnce(new Error('404 zxing_reader.wasm'))
+
+    await expect(create()).rejects.toThrow('404 zxing_reader.wasm')
+
+    expect(ponyfill.constructed).toEqual([])
+    expect(ponyfill.purgeZXingModule).toHaveBeenCalledOnce()
+  })
+})
+
+describe('isDetectorUnavailable', () => {
+  it('recognises the error of a detector whose WebAssembly module is missing', async () => {
+    const { isDetectorUnavailable } = await import('./barcodeDetector')
+
+    expect(isDetectorUnavailable(new DOMException('Barcode detection service unavailable.', 'NotSupportedError'))).toBe(true)
+    expect(isDetectorUnavailable(new DOMException('Invalid element or state.', 'InvalidStateError'))).toBe(false)
+    expect(isDetectorUnavailable(new Error('other'))).toBe(false)
   })
 })
