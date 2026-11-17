@@ -230,6 +230,8 @@ return [
         'mobile'                   => 'portable',
         'month'                    => 'mois',
         'isbn'                     => 'ISBN',
+        'google_volume_id'         => 'volume Google Books',
+        'use_google_cover'         => 'couverture Google Books',
         'name'                     => 'nom',
         'national_code'            => 'code national',
         'number'                   => 'numéro',

@@ -19,6 +19,7 @@ $libraryRoutes = [
     'library.books.edit',
     'library.books.update',
     'library.books.destroy',
+    'library.google-books.lookup',
 ];
 
 it('exposes the library routes to signed-in users', function (bool $admin) use ($libraryRoutes) {

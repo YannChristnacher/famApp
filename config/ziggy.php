@@ -26,6 +26,7 @@ $authenticatedRoutes = [
     'library.books.edit',
     'library.books.update',
     'library.books.destroy',
+    'library.google-books.lookup',
 ];
 
 // Printed only to administrators, on top of the signed-in routes.

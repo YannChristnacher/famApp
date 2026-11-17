@@ -89,3 +89,61 @@ function storedImage(string $path): array
 
     return [$size[0], $size[1], 'mime' => $size['mime']];
 }
+
+/**
+ * A volume as returned by the Google Books API (search item or volume).
+ *
+ * @param  array<string, mixed>  $volumeInfo  Merged into the default volumeInfo.
+ * @return array<string, mixed>
+ */
+function googleVolume(string $id = 'zyTCAlFPjgYC', array $volumeInfo = []): array
+{
+    return [
+        'kind' => 'books#volume',
+        'id' => $id,
+        'etag' => 'f0zKg75Mx/I',
+        'selfLink' => "https://www.googleapis.com/books/v1/volumes/{$id}",
+        'volumeInfo' => array_merge([
+            'title' => 'Le Hobbit',
+            'authors' => ['J. R. R. Tolkien'],
+            'publisher' => 'Gallimard',
+            'publishedDate' => '2012',
+            'industryIdentifiers' => [
+                ['type' => 'ISBN_13', 'identifier' => '9782070368228'],
+                ['type' => 'ISBN_10', 'identifier' => '207036822X'],
+            ],
+            'imageLinks' => [
+                'smallThumbnail' => "http://books.google.com/books/content?id={$id}&printsec=frontcover&img=1&zoom=5&source=gbs_api",
+                'thumbnail' => "http://books.google.com/books/content?id={$id}&printsec=frontcover&img=1&zoom=1&source=gbs_api",
+            ],
+            'language' => 'fr',
+        ], $volumeInfo),
+    ];
+}
+
+/**
+ * A search answer of the Google Books API holding the given volumes.
+ *
+ * @param  list<array<string, mixed>>  $volumes
+ * @return array<string, mixed>
+ */
+function googleSearch(array $volumes): array
+{
+    return $volumes === []
+        ? ['kind' => 'books#volumes', 'totalItems' => 0]
+        : ['kind' => 'books#volumes', 'totalItems' => count($volumes), 'items' => $volumes];
+}
+
+/**
+ * Bytes of a JPEG image made with GD.
+ */
+function jpegBytes(int $width, int $height): string
+{
+    $image = imagecreatetruecolor($width, $height);
+    imagefill($image, 0, 0, (int) imagecolorallocate($image, 200, 40, 40));
+
+    ob_start();
+    imagejpeg($image);
+
+    return (string) ob_get_clean();
+}

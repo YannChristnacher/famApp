@@ -9,6 +9,7 @@ use App\Http\Controllers\Core\HomeController;
 use App\Http\Controllers\Library\BookController;
 use App\Http\Controllers\Library\BookshelfController;
 use App\Http\Controllers\Library\BookshelfPositionController;
+use App\Http\Controllers\Library\GoogleBooksLookupController;
 use App\Http\Controllers\Library\LibraryController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
@@ -63,6 +64,9 @@ Route::middleware('auth')->group(function () {
             ->name('bookshelves.move');
 
         Route::resource('books', BookController::class);
+        Route::get('/google-books', GoogleBooksLookupController::class)
+            ->middleware('throttle:google-books')
+            ->name('google-books.lookup');
     });
 });
 

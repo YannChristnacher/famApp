@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Library;
 
 use App\Models\Library\Book;
+use App\Services\Library\BookCoverInput;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Support\Facades\Gate;
@@ -35,10 +36,15 @@ class UpdateBookRequest extends BookRequest
     }
 
     /**
-     * A new cover replaces the current one anyway.
+     * A new cover (uploaded or from Google) replaces the current one anyway.
      */
     public function removesCover(): bool
     {
-        return $this->boolean('remove_cover') && $this->cover() === null;
+        return $this->boolean('remove_cover') && $this->cover() === null && ! $this->usesGoogleCover();
+    }
+
+    public function coverInput(): BookCoverInput
+    {
+        return new BookCoverInput(file: $this->cover(), remove: $this->removesCover(), fromGoogle: $this->usesGoogleCover());
     }
 }
