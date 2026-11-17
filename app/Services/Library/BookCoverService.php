@@ -29,9 +29,11 @@ class BookCoverService
      */
     public function store(UploadedFile $file): string
     {
+        $angle = $this->uprightAngle($file);
+
         // Resized before being rotated: a rotation copies the image, and
         // copying a full-size photo would double the memory used.
-        $cover = $this->orient($this->resize($this->read($file)), $file);
+        $cover = $this->rotate($this->resize($this->read($file), $this->isQuarterTurn($angle)), $angle);
 
         $path = self::DIRECTORY.'/'.Str::random(40).'.jpg';
         $this->disk()->put($path, $this->encodeJpeg($cover));
@@ -58,8 +60,13 @@ class BookCoverService
 
     private function read(UploadedFile $file): GdImage
     {
-        $contents = (string) file_get_contents($file->getRealPath());
-        $image = $contents === '' ? false : @imagecreatefromstring($contents);
+        $path = $file->getRealPath();
+        $image = match ($file->getMimeType()) {
+            'image/jpeg' => @imagecreatefromjpeg($path),
+            'image/png' => @imagecreatefrompng($path),
+            'image/webp' => @imagecreatefromwebp($path),
+            default => false,
+        };
 
         if (! $image instanceof GdImage) {
             throw ValidationException::withMessages([
@@ -71,23 +78,33 @@ class BookCoverService
     }
 
     /**
-     * Phone photos are often stored sideways with an EXIF orientation tag.
+     * Angle (counter-clockwise, as imagerotate() expects) that turns upright a
+     * JPEG stored sideways with an EXIF orientation tag, as phones do.
      */
-    private function orient(GdImage $image, UploadedFile $file): GdImage
+    private function uprightAngle(UploadedFile $file): int
     {
         if (! function_exists('exif_read_data') || $file->getMimeType() !== 'image/jpeg') {
-            return $image;
+            return 0;
         }
 
         $exif = @exif_read_data($file->getRealPath());
         $orientation = is_array($exif) ? (int) ($exif['Orientation'] ?? 1) : 1;
-        $angle = match ($orientation) {
+
+        return match ($orientation) {
             3 => 180,
             6 => 270,
             8 => 90,
             default => 0,
         };
+    }
 
+    private function isQuarterTurn(int $angle): bool
+    {
+        return $angle === 90 || $angle === 270;
+    }
+
+    private function rotate(GdImage $image, int $angle): GdImage
+    {
         if ($angle === 0) {
             return $image;
         }
@@ -99,13 +116,17 @@ class BookCoverService
 
     /**
      * Never enlarges; always draws on a white canvas (transparent PNG or WebP).
+     * Before a quarter turn, the height of the source becomes the width of the
+     * cover: it is the side bounded by MAX_WIDTH.
      */
-    private function resize(GdImage $source): GdImage
+    private function resize(GdImage $source, bool $beforeQuarterTurn): GdImage
     {
         $width = imagesx($source);
         $height = imagesy($source);
-        $targetWidth = min($width, self::MAX_WIDTH);
-        $targetHeight = max(1, (int) round($height * $targetWidth / $width));
+        $finalWidth = $beforeQuarterTurn ? $height : $width;
+        $scale = min(1, self::MAX_WIDTH / $finalWidth);
+        $targetWidth = max(1, (int) round($width * $scale));
+        $targetHeight = max(1, (int) round($height * $scale));
 
         $canvas = imagecreatetruecolor($targetWidth, $targetHeight);
         imagefill($canvas, 0, 0, (int) imagecolorallocate($canvas, 255, 255, 255));
