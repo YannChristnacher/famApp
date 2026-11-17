@@ -55,15 +55,15 @@
 - Tests : `tests/Feature/Admin/*` (dont `AdminRouteListTest`, `AccountRequestAccessTest`), `resources/js/pages/Admin/**`, `DashboardLayout.admin.test.ts`.
 
 ### Library
-- `bookshelves` : `id`, `user_id` (FK cascade), `name` (100), `position` (1..n compact), unique `user_id`+`name`, index `user_id`+`position`. Pas de table « bibliothèque » : la bibliothèque d'un membre = ses étagères.
-- `app/Models/Library/Bookshelf.php` (`#[Fillable(['name'])]`, `#[UsePolicy]`, `isOwnedBy()`), `User::bookshelves()` (triée position puis id).
+- `bookshelves` : `id`, `user_id` (FK cascade), `name` (100, trimé), `normalized_name` (100, `utf8mb4_bin` sous MySQL), `position` (1..n compact), unique `user_id`+`normalized_name`, unique `user_id`+`position`. Pas de table « bibliothèque » : la bibliothèque d'un membre = ses étagères.
+- `app/Models/Library/Bookshelf.php` (`#[Fillable(['name'])]`, `#[UsePolicy]`, `isOwnedBy()`, `normalizeName()` : trim, espaces multiples réduits, minuscules `mb_strtolower`, accents conservés ; le mutateur de `name` remplit `normalized_name`), `User::bookshelves()` (triée position puis id).
 - `app/Http/Controllers/Library/{LibraryController,BookshelfController,BookshelfPositionController}.php` : `/library` redirige vers `library.bookshelves.index`.
-- `app/Http/Requests/Library/{BookshelfNameRequest,StoreBookshelfRequest,UpdateBookshelfRequest,MoveBookshelfRequest}.php` ; `app/Rules/Library/UniqueBookshelfName.php` (casse ignorée, en PHP) ; `app/Enums/Library/BookshelfMoveDirection.php`.
+- `app/Http/Requests/Library/{BookshelfNameRequest,StoreBookshelfRequest,UpdateBookshelfRequest,MoveBookshelfRequest}.php` ; `app/Rules/Library/UniqueBookshelfName.php` (compare `normalized_name`, même normalisation que l'index) ; `app/Enums/Library/BookshelfMoveDirection.php`.
 - `app/Policies/Library/BookshelfPolicy.php` : `update`, `delete`, `move` propriétaire seulement, sinon `Response::denyAsNotFound()`.
-- `app/Services/Library/BookshelfService.php` : `listFor`, `create`, `rename`, `delete`, `move` ; verrou sur les étagères du propriétaire, renumérotation 1..n.
+- `app/Services/Library/BookshelfService.php` : `listFor`, `create`, `rename`, `delete`, `move` ; chaque écriture verrouille d'abord la ligne `users` du propriétaire (`writingFor`), renumérotation 1..n en deux temps (compatible avec l'index unique des positions).
 - `app/Http/Resources/Library/BookshelfResource.php` (`id`, `name`, `position`), factory `BookshelfFactory`.
 - Front : `pages/Library/Bookshelves/Index.vue`, `components/Library/{BookshelfRenameModal,BookshelfDeleteModal}.vue`, `navigation/modules/library.ts`.
-- Tests : `tests/Feature/Library/*`, `tests/Unit/Library/BookshelfPolicyTest.php`, `resources/js/pages/Library/Bookshelves/Index.test.ts`, `DashboardLayout.library.test.ts`.
+- Tests : `tests/Feature/Library/*` (dont `BookshelfNameUniquenessTest`, `BookshelfServiceLockTest`), `tests/Unit/Library/BookshelfPolicyTest.php`, `resources/js/pages/Library/Bookshelves/Index.test.ts`, `DashboardLayout.library.test.ts`.
 
 ### Garage
 - Rien encore (F09, F10).
@@ -134,8 +134,11 @@
 - Modèle de modale : `components/Library/BookshelfRenameModal.vue` (`v-model:open`, prop nullable, `watch` pour préremplir).
 
 ### Verrou et courses (écritures sensibles)
-- `DB::transaction` + `Model::query()->lockForUpdate()->findOrFail()` puis revérifier l'état sur le modèle relu (modèles : `AccountRequestReviewService::lockPending`, `BookshelfService::lockedBookshelvesOf`).
-- Une `UniqueConstraintViolationException` devient une `ValidationException` française sur le champ.
+- `DB::transaction` + `Model::query()->lockForUpdate()->findOrFail()` puis revérifier l'état sur le modèle relu (modèle : `AccountRequestReviewService::lockPending`).
+- Données d'un membre (étagères, ordre) : verrouiller la ligne `users` du propriétaire (`User::query()->whereKey($id)->lockForUpdate()->firstOrFail()`) au début de **chaque** écriture ; c'est le verrou commun, qui existe même quand le membre n'a encore aucune ligne (verrouiller les étagères ne verrouille rien à la première création). Modèle : `BookshelfService::writingFor`.
+- Renuméroter des positions sous index unique : déplacer d'abord les lignes qui changent au-dessus de toutes les positions, puis les poser (`BookshelfService::savePositions`).
+- Une `UniqueConstraintViolationException` devient une `ValidationException` française sur le champ (seulement si c'est l'index attendu, sinon la relancer).
+- Test du verrou : écouter les requêtes (`DB::listen`) et vérifier que la première est le `select` sur `users` (`for update` vérifié sous MySQL seulement : SQLite l'omet).
 
 ## Décisions et conventions
 
@@ -149,7 +152,7 @@
 - Toasts : flash Inertia `toast` (`success|error`), non conservé dans l'historique (F04).
 - Un accès à la ressource d'un autre membre répond 404, pas 403, admins compris (F05).
 - Positions d'ordre : 1..n compactes, renumérotées à chaque création, suppression ou déplacement sous verrou ; déplacement par pas (monter/descendre), pas de glisser-déposer (F05).
-- Unicité insensible à la casse faite en PHP (`mb_strtolower`) pour que SQLite et MySQL se comportent pareil (F05).
+- Unicité d'un nom libre : colonne `normalized_name` (trim, espaces multiples réduits, minuscules ; accents **conservés** : « Café » ≠ « Cafe ») calculée par le modèle, index unique dessus, collation `utf8mb4_bin` sous MySQL ; la règle de validation compare cette colonne (F05).
 - Contrôleurs : retour sur la liste avec toast ; `/library` est l'entrée du module et redirige (F05).
 - `route()` du front vient de `ziggy-js` (`skip-route-function`), en URL relative (`false`) (F01).
 - `Fortify` : fonctionnalité `resetPasswords()` uniquement ; routes d'auth écrites dans `routes/web.php` ; `laravel/passkeys` est présent mais inactif (F02).
@@ -168,6 +171,8 @@
 - Une Form Request de modification qui autorise via `Gate::inspect()` doit le faire dans `authorize()` : le 404 doit passer avant la validation.
 - Deux admins ou deux clics : relire sous `lockForUpdate()` et revérifier l'état (un modèle périmé ne doit pas permettre un double traitement).
 - Compte créé par admin : mot de passe aléatoire inconnu, `password_set_at` nul ; « Mot de passe oublié » ou la réinitialisation Fortify rendent l'invitation caduque (remplissent `password_set_at`).
+
+- Collations : `utf8mb4_unicode_ci` (MySQL) ignore casse **et accents**, SQLite compare octet par octet (sensible à la casse) : un index unique sur un texte libre ne se comporte pas pareil en local et en prod. Indexer une colonne normalisée en PHP et la passer en `utf8mb4_bin` sous MySQL (`->collation()` seulement si le driver est `mysql` : SQLite ne connaît pas cette collation).
 
 ### Ziggy, Inertia, tests
 - Test Pest d'une page : Ziggy imprime sa liste une fois par processus PHP ; `tests/TestCase.php` la réinitialise (`BladeRouteGenerator::$generated`, `Ziggy::clearRoutes()`), ne pas retirer.
