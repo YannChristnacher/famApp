@@ -16,7 +16,7 @@ Chaque feature a son plan dans `doc/features/<id>-<slug>.md` avant d'être codé
 | F05 | Bibliothèque : CRUD des étagères | Library | F02 | terminée |
 | F06 | Bibliothèque : CRUD des livres en saisie manuelle (couverture uploadée, étagères multiples) | Library | F05 | terminée |
 | F07 | Bibliothèque : préremplissage par ISBN via Google Books (service, données brutes, couverture stockée) | Library | F06 | terminée |
-| F08 | Bibliothèque : scan du code-barres EAN-13 à la caméra | Library | F07 | en cours |
+| F08 | Bibliothèque : scan du code-barres EAN-13 à la caméra | Library | F07 | en relecture |
 | F09 | Garage : CRUD des étagères | Garage | F02 | à faire |
 | F10 | Garage : CRUD des outils (marques partagées, photos multiples, accessoires) | Garage | F09 | à faire |
 | F11 | Consultation des bibliothèques et garages des autres membres (lecture seule) | Library, Garage | F06, F10 | à faire |
