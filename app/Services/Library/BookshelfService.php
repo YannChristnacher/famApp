@@ -5,6 +5,7 @@ namespace App\Services\Library;
 use App\Enums\Library\BookshelfMoveDirection;
 use App\Models\Library\Bookshelf;
 use App\Models\User;
+use App\Support\OrderedPositions;
 use Closure;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -12,7 +13,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Bookshelves of a member and their order: positions always run from 1 to n.
+ * Bookshelves of a member and their order: positions always run from 1 to n
+ * (App\Support\OrderedPositions).
  *
  * Every write first locks the row of the owner in `users`: it is the common
  * lock of all the writes on their bookshelves, which exists even before the
@@ -57,7 +59,7 @@ class BookshelfService
                 ->reject(fn (Bookshelf $other) => $other->is($bookshelf));
 
             $bookshelf->delete();
-            $this->savePositions($remaining);
+            OrderedPositions::save($remaining);
         });
     }
 
@@ -67,15 +69,9 @@ class BookshelfService
     public function move(Bookshelf $bookshelf, BookshelfMoveDirection $direction): void
     {
         $this->writingFor($bookshelf->user_id, function () use ($bookshelf, $direction) {
-            $ordered = $this->bookshelvesOf($bookshelf->user_id)->values()->all();
-            $index = collect($ordered)->search(fn (Bookshelf $other) => $other->is($bookshelf));
-            $target = $index === false ? false : $index + $direction->offset();
-
-            if ($index !== false && $target >= 0 && $target < count($ordered)) {
-                [$ordered[$index], $ordered[$target]] = [$ordered[$target], $ordered[$index]];
-            }
-
-            $this->savePositions(new Collection($ordered));
+            OrderedPositions::save(
+                OrderedPositions::swapWithNeighbour($this->bookshelvesOf($bookshelf->user_id), $bookshelf, $direction->offset()),
+            );
         });
     }
 
@@ -119,29 +115,5 @@ class BookshelfService
             ->orderBy('position')
             ->orderBy('id')
             ->get();
-    }
-
-    /**
-     * Numbers the bookshelves 1..n in the given order. The bookshelves that
-     * change place first go above every current and final position, so that
-     * no two bookshelves ever share a position (unique index user_id+position).
-     *
-     * @param  Collection<int, Bookshelf>  $ordered
-     */
-    private function savePositions(Collection $ordered): void
-    {
-        $ordered = $ordered->values();
-        $moving = $ordered->reject(fn (Bookshelf $bookshelf, int $index) => $bookshelf->position === $index + 1);
-        $ceiling = max($ordered->count(), (int) $ordered->max('position'));
-
-        $moving->each(function (Bookshelf $bookshelf, int $index) use ($ceiling) {
-            $bookshelf->position = $ceiling + $index + 1;
-            $bookshelf->save();
-        });
-
-        $moving->each(function (Bookshelf $bookshelf, int $index) {
-            $bookshelf->position = $index + 1;
-            $bookshelf->save();
-        });
     }
 }
