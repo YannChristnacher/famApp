@@ -57,7 +57,7 @@ Hypothèses :
 ## Status
 - Branch: feature/F05-etageres-bibliotheque
 - Tests written: yes (tests/Feature/Library/*.php, tests/Unit/Library/BookshelfPolicyTest.php, resources/js/pages/Library/Bookshelves/Index.test.ts, resources/js/layouts/DashboardLayout.library.test.ts, resources/js/navigation/registry.test.ts)
-- Tests passing: yes en local (composer test, composer lint, npm run test, npm run lint, npm run build) ; AC16 à confirmer par la CI de la PR.
+- Tests passing: yes en local (composer test, composer lint, npm run test, npm run lint, npm run build) ; AC16 confirmé par la CI de la PR #6 (jobs backend, frontend, e2e, docker verts).
 
 Notes d'implémentation :
 - `UpdateBookshelfRequest` et `MoveBookshelfRequest` autorisent via `Gate::inspect()` : le refus « introuvable » (404) passe avant la validation, donc une requête invalide sur l'étagère d'un autre ne révèle rien.
