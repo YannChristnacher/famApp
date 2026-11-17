@@ -33,7 +33,7 @@ Un membre range ses **livres** dans sa bibliothèque : il saisit à la main le t
 - [x] AC19 (Vitest): Given la fiche d'un livre, when on clique « Supprimer », then une `UModal` nommant le livre s'ouvre ; « Annuler » ne fait rien ; « Supprimer » envoie un `DELETE` vers `/library/books/<id>`.
 - [x] AC20 (Vitest): Given la page des étagères, then chaque étagère a un lien « Voir les livres » vers `/library/books?bookshelf=<id>` et la page un lien vers « Mes livres ».
 - [x] AC21 (Playwright): Given l'admin seedé, when il se connecte, crée une étagère, crée un livre rangé sur cette étagère, then il arrive sur la fiche et le livre apparaît dans « Mes livres » et dans le filtre de l'étagère.
-- [ ] AC22: Given le code, when on lance `composer test`, `composer lint`, `npm run test`, `npm run lint`, `npm run build`, then tout passe, et la CI est verte.
+- [x] AC22: Given le code, when on lance `composer test`, `composer lint`, `npm run test`, `npm run lint`, `npm run build`, then tout passe, et la CI est verte.
 
 ## Technical approach
 1. **Données** : migration `create_books_table` : `books` (`id`, `user_id` FK cascade, `title` 255, `author` 255, `isbn` 13 nullable, `cover_path` nullable, `google_books_data` JSON nullable, timestamps, index `user_id`+`title`) et `book_bookshelf` (`book_id`, `bookshelf_id`, FK cascade des deux côtés, clé primaire composite = unicité du couple). La suppression d'une étagère détache ses livres par la cascade de la clé étrangère.
@@ -58,7 +58,7 @@ Hypothèses :
 ## Status
 - Branch: feature/F06-livres
 - Tests written: yes (tests/Feature/Library/{BookAccess,BookIndex,BookPages,StoreBook,UpdateBook,DestroyBook,BookCoverService,BookshelfDeletionKeepsBooks}Test.php, tests/Unit/Library/{Isbn,BookPolicy}Test.php, resources/js/pages/Library/Books/{Index,Show}.test.ts, resources/js/components/Library/BookForm.test.ts, resources/js/pages/Library/Bookshelves/Index.test.ts, tests/e2e/book.spec.ts)
-- Tests passing: yes en local (composer test, composer lint, npm run test, npm run lint, npm run build, Playwright avec Chrome local) ; AC22 en attente de la CI de la PR.
+- Tests passing: yes en local (composer test, composer lint, npm run test, npm run lint, npm run build, Playwright avec Chrome local) ; AC22 confirmé par la CI de la PR #7 (jobs backend MySQL, frontend, e2e, docker verts).
 
 Notes d'implémentation :
 - L'orientation EXIF des photos JPEG est appliquée **après** la réduction (une rotation copie l'image : sur l'original, la mémoire doublerait) ; testé avec un en-tête EXIF fabriqué (orientations 1, 3, 6, 8).
