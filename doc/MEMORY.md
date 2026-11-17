@@ -133,6 +133,12 @@
 - Form Request dans `app/Http/Requests/<Module>/`, `prepareForValidation()` pour trim ; noms de champs français dans `lang/fr/validation.php` (`attributes`).
 - Modèle de modale : `components/Library/BookshelfRenameModal.vue` (`v-model:open`, prop nullable, `watch` pour préremplir).
 
+### Uploader une image (F06)
+- Validation : `File::image()->types([...])->max(Ko)` + `Rule::dimensions()->maxWidth/maxHeight` (borne la mémoire de GD) ; modèle `BookRequest`.
+- Stockage : `BookCoverService` (GD natif, réduction à 800 px de large, orientation EXIF après réduction, réencodage JPEG sur fond blanc, nom aléatoire, disque `public`). Fichier écrit avant la transaction, supprimé si elle échoue ; l'ancien fichier supprimé après (`BookService::withNewCover`).
+- Front : `UFileUpload` (`v-model` `File | null`, aperçu intégré) dans un `useForm` : Inertia passe en FormData tout seul ; une modification avec fichier part en `form.transform(d => ({ ...d, _method: 'patch' })).post(...)` (PHP ne lit pas le multipart en PATCH).
+- Tests : `Storage::fake('public')`, `UploadedFile::fake()->image()`, helpers `storedImage()` et `transparentPng()` de `tests/Pest.php` ; Vitest : définir `URL.createObjectURL` (absent de jsdom) pour l'aperçu.
+
 ### Verrou et courses (écritures sensibles)
 - `DB::transaction` + `Model::query()->lockForUpdate()->findOrFail()` puis revérifier l'état sur le modèle relu (modèle : `AccountRequestReviewService::lockPending`).
 - Données d'un membre (étagères, ordre) : verrouiller la ligne `users` du propriétaire (`User::query()->whereKey($id)->lockForUpdate()->firstOrFail()`) au début de **chaque** écriture ; c'est le verrou commun, qui existe même quand le membre n'a encore aucune ligne (verrouiller les étagères ne verrouille rien à la première création). Modèle : `BookshelfService::writingFor`.
