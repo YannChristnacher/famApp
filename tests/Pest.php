@@ -3,10 +3,10 @@
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Library\Bookshelf;
 use App\Models\User;
-
-use function Pest\Laravel\actingAs;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
+
+use function Pest\Laravel\actingAs;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)

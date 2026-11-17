@@ -20,7 +20,7 @@ Ouvrir le module Library : chaque membre a une **bibliothèque**, qui n'est pas 
 - [ ] AC7: Given trois étagères, when il demande `library.bookshelves.move` avec `direction` = `up` sur la deuxième, then elle passe en position 1 et la première en 2 ; `down` sur la deuxième l'échange avec la troisième ; `up` sur la première ou `down` sur la dernière ne change rien ; une `direction` absente ou hors `up`/`down` renvoie une erreur de validation et ne change rien. Les positions restent compactes (1..n).
 - [ ] AC8: Given une étagère d'un autre utilisateur, when il appelle `update`, `destroy` ou `move` dessus, then la réponse est 404 et rien ne change (Policy `BookshelfPolicy`, refus en « introuvable » pour ne pas révéler l'existence) ; la Policy n'autorise `update`, `delete` et `move` qu'au propriétaire (testée unitairement).
 - [ ] AC9: Given la liste Ziggy, when un utilisateur connecté charge une page, then `library.index` et les routes `library.bookshelves.*` sont exposées (groupe `auth`) ; when un invité charge une page, then aucune ne l'est.
-- [ ] AC10 (Vitest): Given le registre de navigation, then il contient l'entrée « Bibliothèque » (`i-lucide-library-big`, `library.index`, `requiredRole: null`) ; given le `DashboardLayout`, then elle est visible pour un user et un admin, et active sur `/library/bookshelves`.
+- [ ] AC10 (Vitest): Given le registre de navigation, then il contient l'entrée « Bibliothèque » (`i-lucide-library-big`, `library.index`, `requiredRole: 'user'`, rôle que les admins ont aussi) ; given le `DashboardLayout`, then elle est visible pour un user et un admin, et active sur `/library/bookshelves`.
 - [ ] AC11 (Vitest): Given la page avec des étagères, then elles sont listées dans l'ordre reçu ; sans étagère, then le texte « Votre bibliothèque est vide. » et une invitation à créer la première étagère s'affichent.
 - [ ] AC12 (Vitest): Given la page, when on saisit un nom et soumet le formulaire de création, then un `POST` vers `/library/bookshelves` est envoyé avec `name` ; une erreur serveur s'affiche sous le champ ; le champ est vidé après succès.
 - [ ] AC13 (Vitest): Given la page, when on clique « Renommer » sur une étagère, then une `UModal` s'ouvre avec le nom prérempli ; à la soumission, un `PATCH` vers `/library/bookshelves/<id>` est envoyé ; les erreurs s'affichent dans la modale.
@@ -41,7 +41,7 @@ Ouvrir le module Library : chaque membre a une **bibliothèque**, qui n'est pas 
 6. **Contrôleurs minces** : appel du service, flash `toast` (mécanisme de F04), redirection vers la liste.
 7. **Ziggy** : routes ajoutées au groupe `auth` (donc à la liste par défaut `only`).
 8. **Front** :
-   - `navigation/modules/library.ts` (entrée « Bibliothèque », `i-lucide-library-big`, `requiredRole: null`) ajouté au registre.
+   - `navigation/modules/library.ts` (entrée « Bibliothèque », `i-lucide-library-big`, `requiredRole: 'user'` : tout membre connecté, admins compris, jamais un invité) ajouté au registre.
    - `types/library.ts` (`Bookshelf`, `BookshelfMoveDirection`).
    - `pages/Library/Bookshelves/Index.vue` : `DashboardLayout` (titre « Ma bibliothèque », fil d'Ariane Bibliothèque › Étagères), formulaire de création (`UForm`, `UFormField`, `UInput`, `UButton`), liste des étagères (`UCard`), état vide (`UEmpty` si disponible, sinon `UAlert`), boutons monter/descendre/renommer/supprimer (`UButton` + `UTooltip`).
    - `components/Library/BookshelfRenameModal.vue` et `components/Library/BookshelfDeleteModal.vue` : `UModal` contrôlées (`v-model:open`).
