@@ -6,6 +6,9 @@ use App\Http\Controllers\Auth\AccountRequestController;
 use App\Http\Controllers\Auth\AuthPageController;
 use App\Http\Controllers\Auth\InvitationController;
 use App\Http\Controllers\Core\HomeController;
+use App\Http\Controllers\Garage\GarageController;
+use App\Http\Controllers\Garage\ToolShelfController;
+use App\Http\Controllers\Garage\ToolShelfPositionController;
 use App\Http\Controllers\Library\BookController;
 use App\Http\Controllers\Library\BookshelfController;
 use App\Http\Controllers\Library\BookshelfPositionController;
@@ -67,6 +70,14 @@ Route::middleware('auth')->group(function () {
         Route::get('/google-books', GoogleBooksLookupController::class)
             ->middleware('throttle:google-books')
             ->name('google-books.lookup');
+    });
+
+    Route::prefix('garage')->name('garage.')->group(function () {
+        Route::get('/', GarageController::class)->name('index');
+
+        Route::resource('shelves', ToolShelfController::class)->only(['index', 'store', 'update', 'destroy']);
+        Route::patch('/shelves/{shelf}/move', [ToolShelfPositionController::class, 'update'])
+            ->name('shelves.move');
     });
 });
 

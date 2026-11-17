@@ -1,5 +1,5 @@
 # Mémoire partagée famApp
-> À lire avant d'explorer le code. Mise à jour par l'agent scribe à chaque feature. Dernière mise à jour : F08.
+> À lire avant d'explorer le code. Mise à jour par l'agent scribe à chaque feature. Dernière mise à jour : F09.
 
 ## État du projet
 
@@ -12,7 +12,8 @@
 - F06 bibliothèque : CRUD des livres en saisie manuelle, couverture uploadée, étagères multiples (PR #7) : relue et validée, CI verte ; le statut final dans le backlog passe à `terminée` au merge.
 - F07 bibliothèque : préremplissage par ISBN via Google Books, données brutes, couverture téléchargée, journal des appels (PR #8) : relue et validée, CI verte ; le statut final dans le backlog passe à `terminée` au merge.
 - F08 bibliothèque : scan du code-barres EAN-13 à la caméra dans `BookForm`, 100 % front, aucun changement serveur (PR #9) : relue et validée ; le statut final dans le backlog passe à `terminée` au merge.
-- Prochaine : F09 (étagères du Garage, dépend de F02) ; F10 en dépend.
+- F09 garage : CRUD et ordre des étagères à outils, extraction de `NormalizedName` et `OrderedPositions` (PR #10) : relue et validée, CI verte ; le statut final dans le backlog passe à `terminée` au merge.
+- Prochaine : F10 (outils du Garage, dépend de F09).
 - Suite du backlog : `doc/BACKLOG.md` (source de vérité des statuts).
 
 ## Carte du code par module
@@ -22,17 +23,19 @@
 - `app/Http/Middleware/HandleInertiaRequests.php` : props partagées `auth.user` (`id`, `name`, `email`, `role`, rien d'autre) et `status`.
 - `app/Providers/RateLimitServiceProvider.php` : tous les limiteurs (`login`, `password-reset-link`, `password-reset`, `account-request`, `google-books`) et leur réponse commune ; `google-books` est par membre (`user:<id>`), 10/min, réponse JSON 429.
 - `app/Support/ClientNetwork.php` : clé de limiteur (IPv4 telle quelle, IPv6 groupée par /64, IPv4 encapsulée ramenée à l'IPv4).
+- `app/Support/NormalizedName.php` : `of(string)`, forme de comparaison d'un nom libre (trim, espaces multiples réduits, `mb_strtolower`, accents conservés ; `\s` sans UCP, l'espace insécable n'est pas réduit : ne pas changer, cela rendrait périmés les `normalized_name` stockés). Partagé Library et Garage.
+- `app/Support/OrderedPositions.php` : `swapWithNeighbour(Collection, Model, offset)` (échange avec la voisine, rien aux bornes) et `save(Collection)` (renumérotation 1..n en deux temps sous index unique). Partagé Library et Garage ; l'appelant lit et écrit sous le verrou du propriétaire.
 - `app/Support/ZiggyGroup.php` : groupes Ziggy imprimés selon l'utilisateur (`['guest']`, `['auth']`, `['auth','admin']`).
 - `config/ziggy.php` : liste d'autorisation des routes du front (groupes `guest`, `auth`, `admin` + `only`).
 - `config/famapp.php` : `admin.*` (`ADMIN_NAME|EMAIL|PASSWORD`), `invitation_expire_days` (7).
 - `config/services.php` → `google_books` : `key` (`GOOGLE_BOOKS_API_KEY`, optionnelle), `base_url`, `timeout` (5), `cache_minutes` (30), `save_calls_per_minute` (20), `cover_hosts`, `cover_max_kilobytes` (2048), `cover_timeout` (5).
 - `bootstrap/app.php` : alias middleware `guest` (remplacé) et `invitation`, `authenticateSessions()`, `UnauthenticatedResponse`.
 - Front : `resources/js/app.ts`, `appRoot.ts` (`UApp` + locale `fr`, partagé avec les tests), `layouts/DashboardLayout.vue`, `layouts/AuthLayout.vue`.
-- `navigation/registry.ts` (`navigationRegistry`, `filterEntriesByRoles`, `toNavigationMenuItems`, `isActiveUrl`), `navigation/types.ts`, `navigation/modules/{core,library,admin}.ts`.
+- `navigation/registry.ts` (`navigationRegistry`, `filterEntriesByRoles`, `toNavigationMenuItems`, `isActiveUrl`), `navigation/types.ts`, `navigation/modules/{core,library,garage,admin}.ts`.
 - `composables/useAuth.ts` (`useAuth()`, `rolesOf()` : un admin a `['admin','user']`), `composables/useFlashToasts.ts` (monté par `DashboardLayout`).
-- Types : `resources/js/types/{auth,flash,admin,library}.ts` ; `global.d.ts` typé `Ziggy`, `sharedPageProps`, `flashDataType`.
+- Types : `resources/js/types/{auth,flash,admin,library,garage}.ts` ; `global.d.ts` typé `Ziggy`, `sharedPageProps`, `flashDataType`.
 - `resources/views/vendor/{notifications,mail}/...` : gabarits d'email en français (tous les emails).
-- Tests : `tests/Feature/Core/{HomeTest,LocaleTest}.php`, `tests/Unit/Core/ClientNetworkTest.php`.
+- Tests : `tests/Feature/Core/{HomeTest,LocaleTest}.php`, `tests/Unit/Core/{ClientNetwork,NormalizedName}Test.php`.
 
 ### Auth
 - `app/Enums/Role.php` (`Admin`, `User`, `assignableValues()`), `app/Models/User.php` (`isAdmin()`, `hasSetPassword()`, `bookshelves()`, rôle non assignable en masse).
@@ -62,7 +65,7 @@
 - `bookshelves` : `id`, `user_id` (FK cascade), `name` (100, trimé), `normalized_name` (100, `utf8mb4_bin` sous MySQL), `position` (1..n compact), unique `user_id`+`normalized_name`, unique `user_id`+`position`. Pas de table « bibliothèque » : la bibliothèque d'un membre = ses étagères.
 - `books` : `id`, `user_id` (FK cascade), `title` (255), `author` (255, un seul champ texte), `isbn` (13, nul, normalisé, **non unique**), `cover_path` (nul, chemin sur le disque `public`), `google_books_data` (JSON nul : réponse brute Google du volume retenu, écrite par le serveur seulement, jamais exposée au front), index `user_id`+`title`. Migration `database/migrations/2026_11_17_100000_create_books_table.php`.
 - `book_bookshelf` : `book_id`, `bookshelf_id` (FK cascade des deux côtés), clé primaire composite. Supprimer une étagère ou un livre ne retire que les liens, jamais l'autre côté (aucun code dans `BookshelfService`).
-- `app/Models/Library/Bookshelf.php` (`#[Fillable(['name'])]`, `#[UsePolicy]`, `isOwnedBy()`, `normalizeName()` : trim, espaces multiples réduits, minuscules `mb_strtolower`, accents conservés ; le mutateur de `name` remplit `normalized_name`), `books()` (par titre), `User::bookshelves()` (triée position puis id), `User::books()`.
+- `app/Models/Library/Bookshelf.php` (`#[Fillable(['name'])]`, `#[UsePolicy]`, `isOwnedBy()`, `normalizeName()` délègue à `NormalizedName::of()` ; le mutateur de `name` remplit `normalized_name`), `books()` (par titre), `User::bookshelves()` (triée position puis id), `User::books()`.
 - `app/Models/Library/Book.php` (`#[Fillable(['title','author','isbn'])]` : `cover_path` et `user_id` affectés explicitement, `#[UsePolicy]`, `#[UseFactory]`, `bookshelves()` triées par position, `isOwnedBy()`), `database/factories/Library/BookFactory.php` (état `withCover()`).
 - `app/Http/Controllers/Library/LibraryController.php` : `/library` redirige vers `library.books.index` (« Mes livres ») ; `BookshelfController`, `BookshelfPositionController` inchangés.
 - `app/Http/Controllers/Library/BookController.php` : resource complète `library.books.*` (`index`, `create`, `store`, `show`, `edit`, `update`, `destroy`) ; toast puis fiche après création/modification, liste après suppression.
@@ -70,7 +73,7 @@
 - `app/Http/Requests/Library/{BookshelfNameRequest,StoreBookshelfRequest,UpdateBookshelfRequest,MoveBookshelfRequest}.php` ; `app/Rules/Library/UniqueBookshelfName.php` (compare `normalized_name`) ; `app/Enums/Library/BookshelfMoveDirection.php`.
 - `app/Rules/Library/Isbn.php` : `Isbn::normalize()` (retire tirets/espaces, majuscules) + validation ISBN-10 (modulo 11) et ISBN-13 (modulo 10), message `Isbn::MESSAGE`.
 - `app/Policies/Library/{BookshelfPolicy,BookPolicy}.php` : `update`, `delete`, `move` (étagère) ; `view`, `update`, `delete` (livre) ; propriétaire seulement, sinon `Response::denyAsNotFound()`.
-- `app/Services/Library/BookshelfService.php` : `listFor`, `create`, `rename`, `delete`, `move` ; chaque écriture verrouille d'abord la ligne `users` du propriétaire (`writingFor`), renumérotation 1..n en deux temps.
+- `app/Services/Library/BookshelfService.php` : `listFor`, `create`, `rename`, `delete`, `move` ; chaque écriture verrouille d'abord la ligne `users` du propriétaire (`writingFor`), renumérotation par `OrderedPositions` (`swapWithNeighbour`, `save`).
 - `app/Services/Library/BookService.php` : `listFor(User, ?Bookshelf)` (`with('bookshelves')`, tri titre puis id), `create`, `update`, `delete` ; `withNewCover()` nettoie le fichier neuf si la transaction échoue.
 - `app/Services/Library/BookCoverService.php` : `store(UploadedFile)`, `delete(?string)`, `url(?string)` ; constantes `DISK` (`public`), `DIRECTORY` (`covers`), `MAX_WIDTH` (800).
 - `app/Http/Resources/Library/{BookshelfResource,BookResource}.php` (`BookResource` : `id`, `title`, `author`, `isbn`, `cover_url`, `bookshelves` `{id,name}`) ; factory `BookshelfFactory`.
@@ -101,10 +104,20 @@
 - Tests : Vitest `support/library/{bookBarcode,barcodeDetector}.test.ts`, `components/Library/{IsbnScannerModal,BookForm.scanner}.test.ts` (module détecteur mocké par `vi.mock('@/support/library/barcodeDetector')`, `navigator.mediaDevices` défini par `Object.defineProperty`, `fetch` simulé). Pas de Playwright (pas de caméra en CI).
 
 ### Garage
-- Rien encore (F09, F10).
+- `tool_shelves` : `id`, `user_id` (FK cascade), `name` (100, trimé), `normalized_name` (100, `utf8mb4_bin` sous MySQL), `position` (1..n compact), unique `user_id`+`normalized_name`, unique `user_id`+`position`. Pas de table « garage » : le garage d'un membre = ses étagères. Migration `database/migrations/2026_11_19_000000_create_tool_shelves_table.php`.
+- `app/Models/Garage/ToolShelf.php` (`#[Fillable(['name'])]`, `#[UsePolicy]`, `#[UseFactory]`, `isOwnedBy()`, `normalizeName()` → `NormalizedName`, mutateur de `name` remplit `normalized_name`), `User::toolShelves()` (triée position puis id), `database/factories/Garage/ToolShelfFactory.php` (position suivante du membre).
+- `app/Services/Garage/ToolShelfService.php` : `listFor`, `create`, `rename`, `delete`, `move` ; `writingFor` verrouille la ligne `users` du propriétaire, doublon d'index sur `normalized_name` → `ValidationException` « Vous avez déjà une étagère portant ce nom. » ; positions via `OrderedPositions`. Copie du patron `BookshelfService` (verrou et traduction d'exception restent propres à chaque module).
+- `app/Policies/Garage/ToolShelfPolicy.php` : `update`, `delete`, `move` ; propriétaire seulement, sinon `Response::denyAsNotFound()`.
+- `app/Rules/Garage/UniqueToolShelfName.php` (compare `normalized_name`, parmi les étagères du garage seulement) ; `app/Enums/Garage/ToolShelfMoveDirection.php` (`offset()`).
+- `app/Http/Requests/Garage/{ToolShelfNameRequest (abstraite),StoreToolShelfRequest,UpdateToolShelfRequest,MoveToolShelfRequest}.php` (`Gate::inspect` dans `authorize()` pour update et move).
+- `app/Http/Controllers/Garage/{GarageController,ToolShelfController,ToolShelfPositionController}.php` : `GET /garage` (`garage.index`) redirige vers `garage.shelves.index` (`/garage/shelves`) ; resource `garage.shelves.{index,store,update,destroy}` (paramètre `{shelf}`) + `PATCH /garage/shelves/{shelf}/move` (`garage.shelves.move`). Toutes dans `$authenticatedRoutes` de Ziggy.
+- `app/Http/Resources/Garage/ToolShelfResource.php` : `id`, `name`, `position`.
+- Front : `pages/Garage/Shelves/Index.vue` (« Mon garage », fil d'Ariane Garage › Étagères, état vide « Votre garage est vide. », monter/descendre bloqués pendant la requête), `components/Garage/{ToolShelfRenameModal,ToolShelfDeleteModal}.vue`, `types/garage.ts` (`ToolShelf`, `ToolShelfMoveDirection`), `navigation/modules/garage.ts` (« Garage », `i-lucide-warehouse`, `garage.index`, `requiredRole: 'user'`, après Bibliothèque).
+- Tests : `tests/Feature/Garage/*` (`ToolShelf{Access,Index,NameUniqueness,ServiceLock,Service}Test`, `{Store,Update,Destroy,Move}ToolShelfTest`, `GarageRouteListTest`, `ShelfModulesIsolationTest` : un id d'étagère de l'autre module = 404 des deux côtés), `tests/Unit/Garage/ToolShelfPolicyTest.php`, Vitest `pages/Garage/Shelves/Index.test.ts`, `layouts/DashboardLayout.garage.test.ts`.
+- Pas de Playwright au Garage avant F10 (parcours « ajout outil »).
 
 ### Fichiers de test partagés
-- `tests/Pest.php` : `inertiaHeaders()`, `bookshelfNames(User)` (vérifie aussi les positions 1..n), `signIn()`, `transparentPng(w, h)`, `jpegBytes(w, h)`, `storedImage($path)` (largeur, hauteur, MIME d'une image du disque `public`), `googleVolume()` / `googleSearch()` (réponses Google factices) ; `RefreshDatabase` sur `Feature`.
+- `tests/Pest.php` : `inertiaHeaders()`, `bookshelfNames(User)` et `toolShelfNames(User)` (vérifient aussi les positions 1..n), `signIn()`, `transparentPng(w, h)`, `jpegBytes(w, h)`, `storedImage($path)` (largeur, hauteur, MIME d'une image du disque `public`), `googleVolume()` / `googleSearch()` (réponses Google factices) ; `RefreshDatabase` sur `Feature`.
 - `tests/TestCase.php` : `withoutVite()` + remise à zéro de Ziggy avant chaque test.
 - `resources/js/test/{mountWithUi,setup,testPage}.ts` : voir recettes.
 
@@ -125,7 +138,7 @@
 ### Ajouter une entrée de menu
 1. Créer `resources/js/navigation/modules/<module>.ts` (`NavigationEntry` : `label`, `icon` `i-lucide-…`, `route` nommée, `requiredRole`) et l'ajouter à `navigationRegistry` dans `registry.ts`.
 2. `requiredRole: 'user'` = tout membre connecté (admins inclus) ; `'admin'` = admins ; `null` = tout le monde (même invité, à éviter).
-3. Pointer vers l'entrée du module (`library.index` redirige) pour rester actif sur toutes les sous-pages (`isActiveUrl`).
+3. Pointer vers l'entrée du module (`library.index`, `garage.index` redirigent) pour rester actif sur toutes les sous-pages (`isActiveUrl`).
 4. Mettre à jour `registry.test.ts` et `DashboardLayout.roles.test.ts` (ils comptent les entrées) ; ajouter un `DashboardLayout.<module>.test.ts`.
 5. Les icônes Lucide sont embarquées au build (`@iconify-json/lucide`) : aucune requête Iconify à l'exécution.
 
@@ -163,8 +176,8 @@
 ### Écrire un test Pest
 - Utiliser `Pest\Laravel\get|post|patch|delete|actingAs` et `signIn()` (pas `$this->get()`).
 - Rendu Inertia : `get(route(...))->assertInertia(...)` ; requête Inertia : passer `inertiaHeaders()` en en-têtes.
-- Positions d'étagères : `bookshelfNames($user)`. Mails : `Notification::fake()` ; files : `Queue::fake()` ; temps : `freezeTime()`.
-- Fabriques : `User::factory()->admin()`, `->invited()`, `Bookshelf::factory()->for($user)`, `Book::factory()->for($user)` (`->withCover()`), `AccountRequest::factory()->approved()`.
+- Positions d'étagères : `bookshelfNames($user)`, `toolShelfNames($user)`. Mails : `Notification::fake()` ; files : `Queue::fake()` ; temps : `freezeTime()`.
+- Fabriques : `User::factory()->admin()`, `->invited()`, `Bookshelf::factory()->for($user)`, `ToolShelf::factory()->for($user)`, `Book::factory()->for($user)` (`->withCover()`), `AccountRequest::factory()->approved()`.
 
 ### Écrire un test Vitest
 - Monter avec `mountWithUi(Composant, { props, attachTo: document.body })` (renvoie le wrapper du composant testé).
@@ -187,8 +200,8 @@
 
 ### Verrou et courses (écritures sensibles)
 - `DB::transaction` + `Model::query()->lockForUpdate()->findOrFail()` puis revérifier l'état sur le modèle relu (modèle : `AccountRequestReviewService::lockPending`).
-- Données d'un membre (étagères, ordre) : verrouiller la ligne `users` du propriétaire (`User::query()->whereKey($id)->lockForUpdate()->firstOrFail()`) au début de **chaque** écriture ; c'est le verrou commun, qui existe même quand le membre n'a encore aucune ligne (verrouiller les étagères ne verrouille rien à la première création). Modèle : `BookshelfService::writingFor`.
-- Renuméroter des positions sous index unique : déplacer d'abord les lignes qui changent au-dessus de toutes les positions, puis les poser (`BookshelfService::savePositions`).
+- Données d'un membre (étagères, ordre) : verrouiller la ligne `users` du propriétaire (`User::query()->whereKey($id)->lockForUpdate()->firstOrFail()`) au début de **chaque** écriture ; c'est le verrou commun, qui existe même quand le membre n'a encore aucune ligne (verrouiller les étagères ne verrouille rien à la première création). Modèles : `BookshelfService::writingFor`, `ToolShelfService::writingFor`.
+- Renuméroter des positions sous index unique : `OrderedPositions::save()` (déplace d'abord les lignes qui changent au-dessus de toutes les positions, puis les pose) et `OrderedPositions::swapWithNeighbour()` pour monter/descendre ; ne pas réécrire cette logique.
 - Une `UniqueConstraintViolationException` devient une `ValidationException` française sur le champ (seulement si c'est l'index attendu, sinon la relancer).
 - Test du verrou : écouter les requêtes (`DB::listen`) et vérifier que la première est le `select` sur `users` (`for update` vérifié sous MySQL seulement : SQLite l'omet).
 
@@ -205,6 +218,8 @@
 - Un accès à la ressource d'un autre membre répond 404, pas 403, admins compris (F05).
 - Positions d'ordre : 1..n compactes, renumérotées à chaque création, suppression ou déplacement sous verrou ; déplacement par pas (monter/descendre), pas de glisser-déposer (F05).
 - Unicité d'un nom libre : colonne `normalized_name` (trim, espaces multiples réduits, minuscules ; accents **conservés** : « Café » ≠ « Cafe ») calculée par le modèle, index unique dessus, collation `utf8mb4_bin` sous MySQL ; la règle de validation compare cette colonne (F05).
+- Même nom autorisé entre bibliothèque et garage : `bookshelves` et `tool_shelves` sont deux espaces de noms indépendants, l'unicité ne vaut que parmi les étagères du même module et du même membre (F09).
+- Code partagé entre modules : seulement du générique sans état dans `app/Support/` (`NormalizedName`, `OrderedPositions`), extrait à la deuxième copie (F09) ; service, requests, règle, enum, contrôleurs, page et modales restent dupliqués par module (textes, routes et modèles propres).
 - Contrôleurs : retour sur la liste avec toast ; `/library` est l'entrée du module et redirige, depuis F06 vers `library.books.index` (« Mes livres ») et non plus vers les étagères (F05, F06).
 - Doublons d'ISBN autorisés, même chez un seul membre (choix de l'utilisateur) : aucun index unique ni validation d'unicité sur `isbn` ni sur le titre (F06).
 - ISBN stocké normalisé (chiffres, `X` final majuscule, sans tirets ni espaces), clé de contrôle vérifiée (F06).
@@ -296,8 +311,10 @@
 
 - F11 : `BookPolicy` n'autorise que le propriétaire (404 sinon) ; la lecture seule des autres membres demande une Policy de consultation distincte, sans toucher à `update`/`delete`. `BookResource` expose déjà `cover_url`.
 - F12 : source de recherche livres : `books` (titre, auteur, ISBN) ; index `user_id`+`title` seulement.
-- F10 : la Policy du modèle appartenant à un membre suit `BookshelfPolicy` (404 pour un autre membre) ; la lecture seule des autres membres arrive en F11, avec ses propres Policies de consultation.
-- F09 : le Garage copie le patron de F05 (`Garage/` : modèle, policy, service, requests, page, entrée de menu `navigation/modules/garage.ts`) ; l'ordre des étagères peut réutiliser la logique de position, à extraire seulement si le motif est dupliqué une deuxième fois.
+- F10 : la Policy du modèle appartenant à un membre suit `ToolShelfPolicy`/`BookshelfPolicy` (404 pour un autre membre) ; la lecture seule des autres membres arrive en F11, avec ses propres Policies de consultation.
+- F10 : pivot prévu `tool_tool_shelf` (`tool_id`, `tool_shelf_id`, FK cascade des deux côtés comme `book_bookshelf`) : supprimer une étagère ne retire que les liens, sans code dans `ToolShelfService` ; relation `ToolShelf::tools()`. `ToolShelfResource` pourra gagner un résumé `{id, name}` pour la fiche outil.
+- F10 : faire pointer `GarageController` (`/garage`) vers « Mes outils », comme `LibraryController` vers « Mes livres » en F06 ; le test de redirection de `tests/Feature/Garage/ToolShelfIndexTest.php` est alors à ajuster (jamais retiré) ; ajouter un bouton « Mes outils » et un lien « Voir les outils » par étagère comme en Library.
+- F10 : l'entrée de menu `garage.index` reste active sur toutes les pages `/garage/…` ; ajouter le parcours Playwright « ajout outil » (`tests/e2e/`).
 - F12 : chaque module fournit sa source de recherche globale ; `UDashboardSearch` a `:groups="[]"` et un texte « arrive bientôt » dans `DashboardLayout.vue` à remplacer.
 - F13 : la page de contrôle admin ira dans le groupe `admin` de Ziggy (`$adminRoutes`).
 - F13 : le journal `google_books_requests` (F07, modèle `App\Models\Library\GoogleBooksRequest`, statuts `GoogleBooksRequestStatus`) grossit sans fin : le purger (`Prunable` + durée de conservation configurable, `model:prune` planifié) ; un index `(status, created_at)` sera probablement utile pour les filtres de la page de contrôle (seul `created_at` est indexé aujourd'hui).

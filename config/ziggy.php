@@ -27,6 +27,12 @@ $authenticatedRoutes = [
     'library.books.update',
     'library.books.destroy',
     'library.google-books.lookup',
+    'garage.index',
+    'garage.shelves.index',
+    'garage.shelves.store',
+    'garage.shelves.update',
+    'garage.shelves.destroy',
+    'garage.shelves.move',
 ];
 
 // Printed only to administrators, on top of the signed-in routes.

@@ -7,10 +7,11 @@ const adminEntry: NavigationEntry = { label: 'Administration', icon: 'i-lucide-s
 const userEntry: NavigationEntry = { label: 'Bibliothèque', icon: 'i-lucide-book', route: 'library.index', requiredRole: 'user' }
 
 describe('navigationRegistry', () => {
-  it('declares the Core home entry, the Library entry and the Admin account requests entry', () => {
+  it('declares the Core home entry, the Library entry, the Garage entry and the Admin account requests entry', () => {
     expect(navigationRegistry).toEqual([
       { label: 'Accueil', icon: 'i-lucide-house', route: 'home', requiredRole: null },
       { label: 'Bibliothèque', icon: 'i-lucide-library-big', route: 'library.index', requiredRole: 'user' },
+      { label: 'Garage', icon: 'i-lucide-warehouse', route: 'garage.index', requiredRole: 'user' },
       { label: 'Demandes de compte', icon: 'i-lucide-inbox', route: 'admin.account-requests.index', requiredRole: 'admin' },
     ])
   })

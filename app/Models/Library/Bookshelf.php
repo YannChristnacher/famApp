@@ -4,6 +4,7 @@ namespace App\Models\Library;
 
 use App\Models\User;
 use App\Policies\Library\BookshelfPolicy;
+use App\Support\NormalizedName;
 use Database\Factories\Library\BookshelfFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
@@ -53,7 +54,7 @@ class Bookshelf extends Model
 
     public static function normalizeName(string $name): string
     {
-        return mb_strtolower((string) preg_replace('/\s+/u', ' ', trim($name)));
+        return NormalizedName::of($name);
     }
 
     /**

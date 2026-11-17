@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Role;
+use App\Models\Garage\ToolShelf;
 use App\Models\Library\Book;
 use App\Models\Library\Bookshelf;
 use App\Notifications\Auth\ResetPasswordNotification;
@@ -65,6 +66,16 @@ class User extends Authenticatable
     public function bookshelves(): HasMany
     {
         return $this->hasMany(Bookshelf::class)->orderBy('position')->orderBy('id');
+    }
+
+    /**
+     * The garage of the member: their tool shelves, in their order.
+     *
+     * @return HasMany<ToolShelf, $this>
+     */
+    public function toolShelves(): HasMany
+    {
+        return $this->hasMany(ToolShelf::class)->orderBy('position')->orderBy('id');
     }
 
     /**
