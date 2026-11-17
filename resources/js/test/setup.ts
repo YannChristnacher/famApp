@@ -62,6 +62,7 @@ globalThis.Ziggy = {
     'library.books.edit': { uri: 'library/books/{book}/edit', methods: ['GET', 'HEAD'], parameters: ['book'] },
     'library.books.update': { uri: 'library/books/{book}', methods: ['PUT', 'PATCH'], parameters: ['book'] },
     'library.books.destroy': { uri: 'library/books/{book}', methods: ['DELETE'], parameters: ['book'] },
+    'library.google-books.lookup': { uri: 'library/google-books', methods: ['GET', 'HEAD'] },
     'admin.account-requests.index': { uri: 'admin/account-requests', methods: ['GET', 'HEAD'] },
     'admin.account-requests.account.create': {
       uri: 'admin/account-requests/{accountRequest}/account',

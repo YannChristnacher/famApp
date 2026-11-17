@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useForm } from '@inertiajs/vue3'
 import { route } from 'ziggy-js'
 import BookCover from '@/components/Library/BookCover.vue'
-import type { Book, Bookshelf } from '@/types/library'
+import { useGoogleBooksLookup } from '@/composables/useGoogleBooksLookup'
+import type { Book, Bookshelf, GoogleBooksLookup } from '@/types/library'
 
 const props = defineProps<{
   /** The edited book, null to create one. */
@@ -19,6 +20,10 @@ interface BookFormData {
   bookshelf_ids: number[]
   cover: File | null
   remove_cover: boolean
+  /** Volume found on Google Books: the server fetches its data again. */
+  google_volume_id: string | null
+  /** Asks the server to download the Google cover (an uploaded file wins). */
+  use_google_cover: boolean
 }
 
 const form = useForm<BookFormData>({
@@ -28,13 +33,80 @@ const form = useForm<BookFormData>({
   bookshelf_ids: props.book?.bookshelves.map((bookshelf) => bookshelf.id) ?? [],
   cover: null,
   remove_cover: false,
+  google_volume_id: null,
+  use_google_cover: false,
 })
+
+const { lookup, searching, error: lookupError } = useGoogleBooksLookup()
+/** The volume linked to the form, until the notice is closed or a new search. */
+const googleBook = ref<GoogleBooksLookup | null>(null)
+/** A result that differs from what the member already typed: waits for their choice. */
+const proposal = ref<GoogleBooksLookup | null>(null)
+
+const canSearch = computed(() => form.isbn.trim() !== '' && !searching.value)
+
+const showsGoogleCover = computed(() => googleBook.value?.cover_url != null && form.use_google_cover && form.cover === null)
+
+function differsFromTyped(typed: string, found: string): boolean {
+  return typed.trim() !== '' && found !== '' && typed.trim() !== found
+}
+
+/**
+ * Empty fields are filled at once; typed ones are never overwritten without
+ * the member's consent ("Remplacer" or "Garder ma saisie").
+ */
+async function searchGoogleBooks(): Promise<void> {
+  if (!canSearch.value) {
+    return
+  }
+
+  unlinkGoogleBook()
+  const found = await lookup(form.isbn.trim())
+  if (found === null) {
+    return
+  }
+
+  googleBook.value = found
+  form.google_volume_id = found.volume_id
+  form.use_google_cover = found.cover_url !== null
+  form.clearErrors('isbn', 'google_volume_id')
+
+  if (differsFromTyped(form.title, found.title) || differsFromTyped(form.author, found.author)) {
+    proposal.value = found
+
+    return
+  }
+
+  form.title = form.title.trim() === '' ? found.title : form.title
+  form.author = form.author.trim() === '' ? found.author : form.author
+}
+
+function replaceTypedFields(): void {
+  if (proposal.value === null) {
+    return
+  }
+
+  form.title = proposal.value.title
+  form.author = proposal.value.author === '' ? form.author : proposal.value.author
+  proposal.value = null
+}
+
+function keepTypedFields(): void {
+  proposal.value = null
+}
+
+function unlinkGoogleBook(): void {
+  googleBook.value = null
+  proposal.value = null
+  form.google_volume_id = null
+  form.use_google_cover = false
+}
 
 /** Errors of the list itself or of one of its items (bookshelf_ids.0…). */
 const bookshelfError = computed(() => Object.entries(form.errors as Record<string, string | undefined>)
   .find(([field]) => field === 'bookshelf_ids' || field.startsWith('bookshelf_ids.'))?.[1])
 
-const showsCurrentCover = computed(() => props.book?.cover_url != null && form.cover === null && !form.remove_cover)
+const showsCurrentCover = computed(() => props.book?.cover_url != null && form.cover === null && !form.remove_cover && !showsGoogleCover.value)
 
 const cancelUrl = computed(() => props.book === null
   ? route('library.books.index', undefined, false)
@@ -92,17 +164,57 @@ function submit(): void {
       <UFormField
         label="ISBN"
         name="isbn"
-        help="Facultatif : 10 ou 13 chiffres, tirets et espaces acceptés."
-        :error="form.errors.isbn"
+        help="Facultatif : 10 ou 13 chiffres, tirets et espaces acceptés. « Rechercher » préremplit le titre, l’auteur et la couverture depuis Google Books."
+        :error="form.errors.isbn ?? lookupError ?? form.errors.google_volume_id ?? undefined"
       >
-        <UInput
-          v-model="form.isbn"
-          name="isbn"
-          inputmode="numeric"
-          autocomplete="off"
-          class="w-full"
-        />
+        <div class="flex gap-2">
+          <UInput
+            v-model="form.isbn"
+            name="isbn"
+            inputmode="numeric"
+            autocomplete="off"
+            class="w-full"
+          />
+          <UButton
+            icon="i-lucide-search"
+            color="neutral"
+            variant="outline"
+            :loading="searching"
+            :aria-busy="searching"
+            :disabled="!canSearch"
+            data-testid="google-books-search"
+            @click="searchGoogleBooks"
+          >
+            Rechercher
+          </UButton>
+        </div>
       </UFormField>
+
+      <UAlert
+        v-if="proposal"
+        color="warning"
+        variant="subtle"
+        icon="i-lucide-replace"
+        title="Remplacer votre saisie ?"
+        :description="`Google Books propose « ${proposal.title} »${proposal.author ? ` de ${proposal.author}` : ''}.`"
+        :actions="[
+          { label: 'Remplacer', color: 'warning', onClick: replaceTypedFields },
+          { label: 'Garder ma saisie', color: 'neutral', variant: 'outline', onClick: keepTypedFields },
+        ]"
+        data-testid="google-books-conflict"
+      />
+
+      <UAlert
+        v-if="googleBook"
+        color="info"
+        variant="subtle"
+        icon="i-lucide-book-check"
+        title="Trouvé sur Google Books"
+        :description="`« ${googleBook.title} »${googleBook.author ? ` de ${googleBook.author}` : ''}. Vérifiez les informations avant d’enregistrer ; fermez cet encart pour ne garder que votre saisie.`"
+        :close="{ 'aria-label': 'Ne pas lier ce livre à Google Books' }"
+        data-testid="google-books-result"
+        @update:open="unlinkGoogleBook"
+      />
 
       <UFormField
         label="Étagères"
@@ -133,7 +245,30 @@ function submit(): void {
         :error="form.errors.cover"
       >
         <div
-          v-if="showsCurrentCover"
+          v-if="showsGoogleCover"
+          class="space-y-2"
+          data-testid="google-cover"
+        >
+          <BookCover
+            :url="googleBook?.cover_url ?? null"
+            :title="form.title"
+          />
+          <p class="text-xs text-muted">
+            Couverture Google Books, enregistrée avec le livre.
+          </p>
+          <UButton
+            icon="i-lucide-image-off"
+            color="neutral"
+            variant="outline"
+            size="sm"
+            block
+            @click="form.use_google_cover = false"
+          >
+            Ne pas utiliser cette couverture
+          </UButton>
+        </div>
+        <div
+          v-else-if="showsCurrentCover"
           class="space-y-2"
           data-testid="current-cover"
         >
@@ -160,6 +295,18 @@ function submit(): void {
           :actions="[{ label: 'Annuler', color: 'neutral', variant: 'outline', onClick: () => { form.remove_cover = false } }]"
           class="mb-2"
         />
+        <UButton
+          v-if="googleBook?.cover_url && !form.use_google_cover && form.cover === null"
+          icon="i-lucide-image"
+          color="neutral"
+          variant="outline"
+          size="sm"
+          block
+          class="mb-2"
+          @click="form.use_google_cover = true"
+        >
+          Utiliser la couverture Google
+        </UButton>
         <UFileUpload
           v-model="form.cover"
           name="cover"

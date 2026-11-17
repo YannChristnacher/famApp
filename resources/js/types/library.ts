@@ -32,3 +32,16 @@ export interface Book {
   /** In the order of the library. */
   bookshelves: BookshelfSummary[]
 }
+
+/**
+ * Prefill of the book form found on Google Books (GoogleBooksLookupResource).
+ */
+export interface GoogleBooksLookup {
+  /** Identifier of the Google volume, sent back when the book is saved. */
+  volume_id: string
+  title: string
+  /** The authors joined by ", ", empty when Google lists none. */
+  author: string
+  /** https URL of the Google cover, null without cover. */
+  cover_url: string | null
+}
