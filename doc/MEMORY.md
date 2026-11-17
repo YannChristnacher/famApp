@@ -1,5 +1,5 @@
 # Mémoire partagée famApp
-> À lire avant d'explorer le code. Mise à jour par l'agent scribe à chaque feature. Dernière mise à jour : F05.
+> À lire avant d'explorer le code. Mise à jour par l'agent scribe à chaque feature. Dernière mise à jour : F06.
 
 ## État du projet
 
@@ -8,8 +8,9 @@
 - F02 authentification (Fortify, rôles admin/user, seeder admin, Playwright login) : terminée.
 - F03 demande de compte publique (job, notification admin, limiteur) : terminée.
 - F04 admin : liste des demandes, création du compte, invitation signée 7 jours, toasts flash : terminée.
-- F05 bibliothèque : CRUD et ordre des étagères (PR #6) : en relecture, CI verte.
-- Prochaine : F06 (livres en saisie manuelle). F09 (étagères du Garage) peut aussi démarrer (dépend de F02).
+- F05 bibliothèque : CRUD et ordre des étagères : terminée.
+- F06 bibliothèque : CRUD des livres en saisie manuelle, couverture uploadée, étagères multiples (PR #7) : relue et validée, CI verte ; le statut final dans le backlog passe à `terminée` au merge.
+- Prochaine : F07 (préremplissage par ISBN via Google Books). F09 (étagères du Garage) peut aussi démarrer (dépend de F02).
 - Suite du backlog : `doc/BACKLOG.md` (source de vérité des statuts).
 
 ## Carte du code par module
@@ -56,20 +57,29 @@
 
 ### Library
 - `bookshelves` : `id`, `user_id` (FK cascade), `name` (100, trimé), `normalized_name` (100, `utf8mb4_bin` sous MySQL), `position` (1..n compact), unique `user_id`+`normalized_name`, unique `user_id`+`position`. Pas de table « bibliothèque » : la bibliothèque d'un membre = ses étagères.
-- `app/Models/Library/Bookshelf.php` (`#[Fillable(['name'])]`, `#[UsePolicy]`, `isOwnedBy()`, `normalizeName()` : trim, espaces multiples réduits, minuscules `mb_strtolower`, accents conservés ; le mutateur de `name` remplit `normalized_name`), `User::bookshelves()` (triée position puis id).
-- `app/Http/Controllers/Library/{LibraryController,BookshelfController,BookshelfPositionController}.php` : `/library` redirige vers `library.bookshelves.index`.
-- `app/Http/Requests/Library/{BookshelfNameRequest,StoreBookshelfRequest,UpdateBookshelfRequest,MoveBookshelfRequest}.php` ; `app/Rules/Library/UniqueBookshelfName.php` (compare `normalized_name`, même normalisation que l'index) ; `app/Enums/Library/BookshelfMoveDirection.php`.
-- `app/Policies/Library/BookshelfPolicy.php` : `update`, `delete`, `move` propriétaire seulement, sinon `Response::denyAsNotFound()`.
-- `app/Services/Library/BookshelfService.php` : `listFor`, `create`, `rename`, `delete`, `move` ; chaque écriture verrouille d'abord la ligne `users` du propriétaire (`writingFor`), renumérotation 1..n en deux temps (compatible avec l'index unique des positions).
-- `app/Http/Resources/Library/BookshelfResource.php` (`id`, `name`, `position`), factory `BookshelfFactory`.
-- Front : `pages/Library/Bookshelves/Index.vue`, `components/Library/{BookshelfRenameModal,BookshelfDeleteModal}.vue`, `navigation/modules/library.ts`.
-- Tests : `tests/Feature/Library/*` (dont `BookshelfNameUniquenessTest`, `BookshelfServiceLockTest`), `tests/Unit/Library/BookshelfPolicyTest.php`, `resources/js/pages/Library/Bookshelves/Index.test.ts`, `DashboardLayout.library.test.ts`.
+- `books` : `id`, `user_id` (FK cascade), `title` (255), `author` (255, un seul champ texte), `isbn` (13, nul, normalisé, **non unique**), `cover_path` (nul, chemin sur le disque `public`), `google_books_data` (JSON nul : créé pour F07, jamais saisi ni exposé), index `user_id`+`title`. Migration `database/migrations/2026_11_17_100000_create_books_table.php`.
+- `book_bookshelf` : `book_id`, `bookshelf_id` (FK cascade des deux côtés), clé primaire composite. Supprimer une étagère ou un livre ne retire que les liens, jamais l'autre côté (aucun code dans `BookshelfService`).
+- `app/Models/Library/Bookshelf.php` (`#[Fillable(['name'])]`, `#[UsePolicy]`, `isOwnedBy()`, `normalizeName()` : trim, espaces multiples réduits, minuscules `mb_strtolower`, accents conservés ; le mutateur de `name` remplit `normalized_name`), `books()` (par titre), `User::bookshelves()` (triée position puis id), `User::books()`.
+- `app/Models/Library/Book.php` (`#[Fillable(['title','author','isbn'])]` : `cover_path` et `user_id` affectés explicitement, `#[UsePolicy]`, `#[UseFactory]`, `bookshelves()` triées par position, `isOwnedBy()`), `database/factories/Library/BookFactory.php` (état `withCover()`).
+- `app/Http/Controllers/Library/LibraryController.php` : `/library` redirige vers `library.books.index` (« Mes livres ») ; `BookshelfController`, `BookshelfPositionController` inchangés.
+- `app/Http/Controllers/Library/BookController.php` : resource complète `library.books.*` (`index`, `create`, `store`, `show`, `edit`, `update`, `destroy`) ; toast puis fiche après création/modification, liste après suppression.
+- `app/Http/Requests/Library/BookRequest.php` (abstraite : champs partagés, trim, normalisation ISBN, `bookAttributes()`, `bookshelfIds()`, `cover()`), `StoreBookRequest`, `UpdateBookRequest` (`Gate::inspect('update')` dans `authorize()`, `remove_cover`, `removesCover()`), `ListBooksRequest` (`bookshelfFilter()` : étagère du membre, sinon 404 ; paramètre non entier = 404).
+- `app/Http/Requests/Library/{BookshelfNameRequest,StoreBookshelfRequest,UpdateBookshelfRequest,MoveBookshelfRequest}.php` ; `app/Rules/Library/UniqueBookshelfName.php` (compare `normalized_name`) ; `app/Enums/Library/BookshelfMoveDirection.php`.
+- `app/Rules/Library/Isbn.php` : `Isbn::normalize()` (retire tirets/espaces, majuscules) + validation ISBN-10 (modulo 11) et ISBN-13 (modulo 10), message `Isbn::MESSAGE`.
+- `app/Policies/Library/{BookshelfPolicy,BookPolicy}.php` : `update`, `delete`, `move` (étagère) ; `view`, `update`, `delete` (livre) ; propriétaire seulement, sinon `Response::denyAsNotFound()`.
+- `app/Services/Library/BookshelfService.php` : `listFor`, `create`, `rename`, `delete`, `move` ; chaque écriture verrouille d'abord la ligne `users` du propriétaire (`writingFor`), renumérotation 1..n en deux temps.
+- `app/Services/Library/BookService.php` : `listFor(User, ?Bookshelf)` (`with('bookshelves')`, tri titre puis id), `create`, `update`, `delete` ; `withNewCover()` nettoie le fichier neuf si la transaction échoue.
+- `app/Services/Library/BookCoverService.php` : `store(UploadedFile)`, `delete(?string)`, `url(?string)` ; constantes `DISK` (`public`), `DIRECTORY` (`covers`), `MAX_WIDTH` (800).
+- `app/Http/Resources/Library/{BookshelfResource,BookResource}.php` (`BookResource` : `id`, `title`, `author`, `isbn`, `cover_url`, `bookshelves` `{id,name}`) ; factory `BookshelfFactory`.
+- Front : `pages/Library/Books/{Index,Create,Edit,Show}.vue` (Index : grille de cartes + filtres par étagère), `pages/Library/Bookshelves/Index.vue` (bouton « Mes livres », lien « Voir les livres » par étagère), `components/Library/{BookCard,BookCover,BookForm,BookDeleteModal,BookshelfRenameModal,BookshelfDeleteModal}.vue`, `types/library.ts` (`Bookshelf`, `BookshelfSummary`, `Book`), `navigation/modules/library.ts`.
+- `lang/fr/validation.php` : noms de champs des livres (`attributes`).
+- Tests : `tests/Feature/Library/*` (`Book{Access,Index,Pages}Test`, `{Store,Update,Destroy}BookTest`, `BookCoverServiceTest`, `BookshelfDeletionKeepsBooksTest`, `BookshelfNameUniquenessTest`, `BookshelfServiceLockTest`, `LibraryRouteListTest`), `tests/Unit/Library/{BookshelfPolicyTest,BookPolicyTest,IsbnTest}.php`, Vitest `pages/Library/Books/{Index,Show}.test.ts`, `components/Library/BookForm.test.ts`, `pages/Library/Bookshelves/Index.test.ts`, `DashboardLayout.library.test.ts`, Playwright `tests/e2e/book.spec.ts`.
 
 ### Garage
 - Rien encore (F09, F10).
 
 ### Fichiers de test partagés
-- `tests/Pest.php` : `inertiaHeaders()`, `bookshelfNames(User)` (vérifie aussi les positions 1..n), `signIn()` ; `RefreshDatabase` sur `Feature`.
+- `tests/Pest.php` : `inertiaHeaders()`, `bookshelfNames(User)` (vérifie aussi les positions 1..n), `signIn()`, `transparentPng(w, h)`, `storedImage($path)` (largeur, hauteur, MIME d'une image du disque `public`) ; `RefreshDatabase` sur `Feature`.
 - `tests/TestCase.php` : `withoutVite()` + remise à zéro de Ziggy avant chaque test.
 - `resources/js/test/{mountWithUi,setup,testPage}.ts` : voir recettes.
 
@@ -119,7 +129,7 @@
 - Utiliser `Pest\Laravel\get|post|patch|delete|actingAs` et `signIn()` (pas `$this->get()`).
 - Rendu Inertia : `get(route(...))->assertInertia(...)` ; requête Inertia : passer `inertiaHeaders()` en en-têtes.
 - Positions d'étagères : `bookshelfNames($user)`. Mails : `Notification::fake()` ; files : `Queue::fake()` ; temps : `freezeTime()`.
-- Fabriques : `User::factory()->admin()`, `->invited()`, `Bookshelf::factory()->for($user)`, `AccountRequest::factory()->approved()`.
+- Fabriques : `User::factory()->admin()`, `->invited()`, `Bookshelf::factory()->for($user)`, `Book::factory()->for($user)` (`->withCover()`), `AccountRequest::factory()->approved()`.
 
 ### Écrire un test Vitest
 - Monter avec `mountWithUi(Composant, { props, attachTo: document.body })` (renvoie le wrapper du composant testé).
@@ -135,7 +145,8 @@
 
 ### Uploader une image (F06)
 - Validation : `File::image()->types([...])->max(Ko)` + `Rule::dimensions()->maxWidth/maxHeight` (borne la mémoire de GD) ; modèle `BookRequest`.
-- Stockage : `BookCoverService` (GD natif, réduction à 800 px de large, orientation EXIF appliquée après réduction mais prise en compte pour la largeur cible (largeur après rotation), décodage selon le type (`imagecreatefromjpeg|png|webp`), réencodage JPEG sur fond blanc, nom aléatoire, disque `public`). Fichier écrit avant la transaction, supprimé si elle échoue ; l'ancien fichier supprimé après (`BookService::withNewCover`).
+- Stockage : `BookCoverService` (GD natif, réduction à 800 px de large sans agrandir, orientation EXIF appliquée après réduction mais prise en compte pour la largeur cible (largeur après rotation), décodage selon le type MIME (`imagecreatefromjpeg|png|webp`), réencodage JPEG sur fond blanc donc sans aucun EXIF, nom aléatoire `covers/<40 car.>.jpg`, disque `public`). Fichier écrit avant la transaction, supprimé si elle échoue ; l'ancien fichier supprimé après (`BookService::withNewCover`).
+- Affichage : `BookResource` → `cover_url` ; en local, `php artisan storage:link` est nécessaire (l'image prod le fait). Sans couverture, `BookCover.vue` montre un bloc `UIcon` `i-lucide-book`.
 - Front : `UFileUpload` (`v-model` `File | null`, aperçu intégré) dans un `useForm` : Inertia passe en FormData tout seul ; une modification avec fichier part en `form.transform(d => ({ ...d, _method: 'patch' })).post(...)` (PHP ne lit pas le multipart en PATCH).
 - Tests : `Storage::fake('public')`, `UploadedFile::fake()->image()`, helpers `storedImage()` et `transparentPng()` de `tests/Pest.php` ; Vitest : définir `URL.createObjectURL` (absent de jsdom) pour l'aperçu.
 
@@ -159,10 +170,15 @@
 - Un accès à la ressource d'un autre membre répond 404, pas 403, admins compris (F05).
 - Positions d'ordre : 1..n compactes, renumérotées à chaque création, suppression ou déplacement sous verrou ; déplacement par pas (monter/descendre), pas de glisser-déposer (F05).
 - Unicité d'un nom libre : colonne `normalized_name` (trim, espaces multiples réduits, minuscules ; accents **conservés** : « Café » ≠ « Cafe ») calculée par le modèle, index unique dessus, collation `utf8mb4_bin` sous MySQL ; la règle de validation compare cette colonne (F05).
-- Contrôleurs : retour sur la liste avec toast ; `/library` est l'entrée du module et redirige (F05).
+- Contrôleurs : retour sur la liste avec toast ; `/library` est l'entrée du module et redirige, depuis F06 vers `library.books.index` (« Mes livres ») et non plus vers les étagères (F05, F06).
+- Doublons d'ISBN autorisés, même chez un seul membre (choix de l'utilisateur) : aucun index unique ni validation d'unicité sur `isbn` ni sur le titre (F06).
+- ISBN stocké normalisé (chiffres, `X` final majuscule, sans tirets ni espaces), clé de contrôle vérifiée (F06).
+- Couvertures : JPEG réencodé, 800 px max, sans EXIF ; limites 10 Mo et 6000 px de côté, types JPEG/PNG/WebP seulement (pas de GIF ni SVG) (F06).
+- Livre : liste triée par titre puis id ; filtre `?bookshelf=<id>` sur une étagère inconnue ou d'un autre = 404 ; étagère d'un autre dans `bookshelf_ids` = erreur de validation (n'en révèle pas l'existence) (F06).
+- Après création ou modification : retour sur la fiche ; après suppression : retour sur la liste (F06).
 - `route()` du front vient de `ziggy-js` (`skip-route-function`), en URL relative (`false`) (F01).
 - `Fortify` : fonctionnalité `resetPasswords()` uniquement ; routes d'auth écrites dans `routes/web.php` ; `laravel/passkeys` est présent mais inactif (F02).
-- Pas de Playwright hors parcours clés ; actuellement seulement `tests/e2e/login.spec.ts` (job CI `e2e`) ; l'ajout de livre arrive avec F06 (F02).
+- Pas de Playwright hors parcours clés ; `tests/e2e/login.spec.ts` (F02) et `tests/e2e/book.spec.ts` (étagère puis livre, F06) ; job CI `e2e`.
 
 ## Pièges connus
 
@@ -180,6 +196,16 @@
 
 - Collations : `utf8mb4_unicode_ci` (MySQL) ignore casse **et accents**, SQLite compare octet par octet (sensible à la casse) : un index unique sur un texte libre ne se comporte pas pareil en local et en prod. Indexer une colonne normalisée en PHP et la passer en `utf8mb4_bin` sous MySQL (`->collation()` seulement si le driver est `mysql` : SQLite ne connaît pas cette collation).
 
+### Upload et couvertures (relevés en relecture F06)
+- Une rotation GD copie l'image : redimensionner **avant** de pivoter, sinon la mémoire double. Pour un quart de tour (EXIF 6 ou 8), la largeur cible est la hauteur de la source (4032×3024 → 800×1067).
+- Écrire le fichier avant la transaction et le supprimer si elle échoue ; supprimer l'ancien fichier seulement après le commit (`BookService::withNewCover`). Tests : faire échouer `Book::saving` et vérifier le disque.
+- Garder les bornes de dimensions (`Rule::dimensions()`) : sans elles GD peut épuiser la mémoire sur une image légère mais énorme.
+- Photo source avec EXIF (GPS) : le réencodage GD le supprime, le test le vérifie ; ne pas stocker l'original.
+- Un fichier ne part pas en PATCH (PHP ne lit pas le multipart) : `POST` + `_method=patch` ; `Update` doit rester testé avec fichier.
+- La cascade SQL ne supprime pas les fichiers : tout nouveau chemin de suppression de livre (ou de compte) doit appeler `BookCoverService::delete`.
+- `UploadedFile::fake()->image()` est opaque : `transparentPng()` pour tester le fond blanc.
+- Étagère d'un autre dans `bookshelf_ids` : `Rule::exists(...)->where('user_id', …)` obligatoire, sinon on range son livre sur l'étagère d'un autre.
+
 ### Ziggy, Inertia, tests
 - Test Pest d'une page : Ziggy imprime sa liste une fois par processus PHP ; `tests/TestCase.php` la réinitialise (`BladeRouteGenerator::$generated`, `Ziggy::clearRoutes()`), ne pas retirer.
 - Requête Inertia dans un test sans `X-Inertia-Version` : le contrôle de version renvoie un 409 ; utiliser `inertiaHeaders()`.
@@ -190,6 +216,7 @@
 - `UAuthForm` n'a pas de champ textarea et son slot dynamique `#<champ>-field` est mal typé : lier un `UTextarea` à `useForm` directement (`RequestAccount.vue`).
 - `UDashboardSearch` ajoute un groupe « Thème » : désactivé par `:color-mode="false"`.
 - `components.d.ts` et `auto-imports.d.ts` sont générés (unplugin) mais versionnés : ils changent après `npm run build` ou Vitest ; ne les éditer pas à la main, committer leur régénération seulement si une feature change les composants utilisés.
+- Un changement de redirection (`/library`) casse des tests d'une feature précédente : les ajuster (jamais les retirer), comme `BookshelfIndexTest` et `BookshelfAccessTest` en F06.
 - Les tests existants qui comptent les entrées de menu doivent être ajustés (jamais retirés) quand un module ajoute une entrée.
 - Playwright : navigateurs non téléchargeables ici ; en local `PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/google-chrome`, la CI installe chromium.
 
@@ -204,11 +231,14 @@
 
 ## Notes pour les features à venir
 
-- F06 : `Bookshelf` n'a pas de relation livres ; prévoir une table pivot `book_bookshelf` (étagères multiples) et recompter ce que la suppression d'une étagère fait aux livres (ils ne sont pas supprimés). Ajouter `library.books.*` au groupe `auth` de Ziggy ; `/library` redirige aujourd'hui vers les étagères, F06 peut en faire une vue d'ensemble. Premier upload : `FILESYSTEM_DISK=public` (déjà dans `.env.example`), nom de fichier généré, jamais celui du client.
-- F06/F10 : la Policy du modèle appartenant à un membre suit `BookshelfPolicy` (404 pour un autre membre) ; la lecture seule des autres membres arrive en F11, avec ses propres Policies de consultation.
+- F07 : `books.google_books_data` (JSON) et `books.isbn` existent déjà ; `Isbn::normalize()` / `Isbn` pour valider ; la couverture Google doit passer par `BookCoverService` (téléchargement puis `store`, jamais d'URL distante stockée) ; `BookForm.vue` est le point d'entrée du préremplissage ; `Http::fake()` pour les tests ; appels Google Books à journaliser pour F13.
+- F08 : le scan EAN-13 alimente le champ ISBN de `BookForm.vue`.
+- F11 : `BookPolicy` n'autorise que le propriétaire (404 sinon) ; la lecture seule des autres membres demande une Policy de consultation distincte, sans toucher à `update`/`delete`. `BookResource` expose déjà `cover_url`.
+- F12 : source de recherche livres : `books` (titre, auteur, ISBN) ; index `user_id`+`title` seulement.
+- F10 : la Policy du modèle appartenant à un membre suit `BookshelfPolicy` (404 pour un autre membre) ; la lecture seule des autres membres arrive en F11, avec ses propres Policies de consultation.
 - F09 : le Garage copie le patron de F05 (`Garage/` : modèle, policy, service, requests, page, entrée de menu `navigation/modules/garage.ts`) ; l'ordre des étagères peut réutiliser la logique de position, à extraire seulement si le motif est dupliqué une deuxième fois.
 - F12 : chaque module fournit sa source de recherche globale ; `UDashboardSearch` a `:groups="[]"` et un texte « arrive bientôt » dans `DashboardLayout.vue` à remplacer.
 - F13 : la page de contrôle admin ira dans le groupe `admin` de Ziggy (`$adminRoutes`).
 - F14 : configurer `trustProxies` (sinon tous les visiteurs partagent la même IP dans les limiteurs) ; les liens d'invitation signés exigent la bonne config proxy/HTTPS ; masquer `signature` dans les logs Nginx.
 - Les comptes ne peuvent pas être supprimés aujourd'hui ; les étagères se suppriment en cascade avec le compte.
-- Si un jour un compte peut être supprimé, supprimer aussi ses couvertures (la cascade SQL ne nettoie pas le disque).
+- Si un jour un compte peut être supprimé, supprimer aussi ses couvertures (`books.cover_path` ; la cascade SQL ne nettoie pas le disque).
