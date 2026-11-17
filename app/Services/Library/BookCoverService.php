@@ -29,11 +29,12 @@ class BookCoverService
      */
     public function store(UploadedFile $file): string
     {
-        $source = $this->read($file);
-        $resized = $this->resize($source);
+        // Resized before being rotated: a rotation copies the image, and
+        // copying a full-size photo would double the memory used.
+        $cover = $this->orient($this->resize($this->read($file)), $file);
 
         $path = self::DIRECTORY.'/'.Str::random(40).'.jpg';
-        $this->disk()->put($path, $this->encodeJpeg($resized));
+        $this->disk()->put($path, $this->encodeJpeg($cover));
 
         return $path;
     }
@@ -66,7 +67,7 @@ class BookCoverService
             ]);
         }
 
-        return $this->orient($image, $file);
+        return $image;
     }
 
     /**
