@@ -1,5 +1,5 @@
 # Mémoire partagée famApp
-> À lire avant d'explorer le code. Mise à jour par l'agent scribe à chaque feature. Dernière mise à jour : F06.
+> À lire avant d'explorer le code. Mise à jour par l'agent scribe à chaque feature. Dernière mise à jour : F07.
 
 ## État du projet
 
@@ -10,7 +10,8 @@
 - F04 admin : liste des demandes, création du compte, invitation signée 7 jours, toasts flash : terminée.
 - F05 bibliothèque : CRUD et ordre des étagères : terminée.
 - F06 bibliothèque : CRUD des livres en saisie manuelle, couverture uploadée, étagères multiples (PR #7) : relue et validée, CI verte ; le statut final dans le backlog passe à `terminée` au merge.
-- Prochaine : F07 (préremplissage par ISBN via Google Books). F09 (étagères du Garage) peut aussi démarrer (dépend de F02).
+- F07 bibliothèque : préremplissage par ISBN via Google Books, données brutes, couverture téléchargée, journal des appels (PR #8) : relue et validée, CI verte ; le statut final dans le backlog passe à `terminée` au merge.
+- Prochaine : F08 (scan EAN-13). F09 (étagères du Garage) peut aussi démarrer (dépend de F02).
 - Suite du backlog : `doc/BACKLOG.md` (source de vérité des statuts).
 
 ## Carte du code par module
@@ -18,11 +19,12 @@
 ### Core
 - `app/Http/Controllers/Core/HomeController.php` : page `Core/Home`.
 - `app/Http/Middleware/HandleInertiaRequests.php` : props partagées `auth.user` (`id`, `name`, `email`, `role`, rien d'autre) et `status`.
-- `app/Providers/RateLimitServiceProvider.php` : tous les limiteurs (`login`, `password-reset-link`, `password-reset`, `account-request`) et leur réponse commune.
+- `app/Providers/RateLimitServiceProvider.php` : tous les limiteurs (`login`, `password-reset-link`, `password-reset`, `account-request`, `google-books`) et leur réponse commune ; `google-books` est par membre (`user:<id>`), 10/min, réponse JSON 429.
 - `app/Support/ClientNetwork.php` : clé de limiteur (IPv4 telle quelle, IPv6 groupée par /64, IPv4 encapsulée ramenée à l'IPv4).
 - `app/Support/ZiggyGroup.php` : groupes Ziggy imprimés selon l'utilisateur (`['guest']`, `['auth']`, `['auth','admin']`).
 - `config/ziggy.php` : liste d'autorisation des routes du front (groupes `guest`, `auth`, `admin` + `only`).
 - `config/famapp.php` : `admin.*` (`ADMIN_NAME|EMAIL|PASSWORD`), `invitation_expire_days` (7).
+- `config/services.php` → `google_books` : `key` (`GOOGLE_BOOKS_API_KEY`, optionnelle), `base_url`, `timeout` (5), `cache_minutes` (30), `save_calls_per_minute` (20), `cover_hosts`, `cover_max_kilobytes` (2048), `cover_timeout` (5).
 - `bootstrap/app.php` : alias middleware `guest` (remplacé) et `invitation`, `authenticateSessions()`, `UnauthenticatedResponse`.
 - Front : `resources/js/app.ts`, `appRoot.ts` (`UApp` + locale `fr`, partagé avec les tests), `layouts/DashboardLayout.vue`, `layouts/AuthLayout.vue`.
 - `navigation/registry.ts` (`navigationRegistry`, `filterEntriesByRoles`, `toNavigationMenuItems`, `isActiveUrl`), `navigation/types.ts`, `navigation/modules/{core,library,admin}.ts`.
@@ -57,7 +59,7 @@
 
 ### Library
 - `bookshelves` : `id`, `user_id` (FK cascade), `name` (100, trimé), `normalized_name` (100, `utf8mb4_bin` sous MySQL), `position` (1..n compact), unique `user_id`+`normalized_name`, unique `user_id`+`position`. Pas de table « bibliothèque » : la bibliothèque d'un membre = ses étagères.
-- `books` : `id`, `user_id` (FK cascade), `title` (255), `author` (255, un seul champ texte), `isbn` (13, nul, normalisé, **non unique**), `cover_path` (nul, chemin sur le disque `public`), `google_books_data` (JSON nul : créé pour F07, jamais saisi ni exposé), index `user_id`+`title`. Migration `database/migrations/2026_11_17_100000_create_books_table.php`.
+- `books` : `id`, `user_id` (FK cascade), `title` (255), `author` (255, un seul champ texte), `isbn` (13, nul, normalisé, **non unique**), `cover_path` (nul, chemin sur le disque `public`), `google_books_data` (JSON nul : réponse brute Google du volume retenu, écrite par le serveur seulement, jamais exposée au front), index `user_id`+`title`. Migration `database/migrations/2026_11_17_100000_create_books_table.php`.
 - `book_bookshelf` : `book_id`, `bookshelf_id` (FK cascade des deux côtés), clé primaire composite. Supprimer une étagère ou un livre ne retire que les liens, jamais l'autre côté (aucun code dans `BookshelfService`).
 - `app/Models/Library/Bookshelf.php` (`#[Fillable(['name'])]`, `#[UsePolicy]`, `isOwnedBy()`, `normalizeName()` : trim, espaces multiples réduits, minuscules `mb_strtolower`, accents conservés ; le mutateur de `name` remplit `normalized_name`), `books()` (par titre), `User::bookshelves()` (triée position puis id), `User::books()`.
 - `app/Models/Library/Book.php` (`#[Fillable(['title','author','isbn'])]` : `cover_path` et `user_id` affectés explicitement, `#[UsePolicy]`, `#[UseFactory]`, `bookshelves()` triées par position, `isOwnedBy()`), `database/factories/Library/BookFactory.php` (état `withCover()`).
@@ -75,11 +77,25 @@
 - `lang/fr/validation.php` : noms de champs des livres (`attributes`).
 - Tests : `tests/Feature/Library/*` (`Book{Access,Index,Pages}Test`, `{Store,Update,Destroy}BookTest`, `BookCoverServiceTest`, `BookshelfDeletionKeepsBooksTest`, `BookshelfNameUniquenessTest`, `BookshelfServiceLockTest`, `LibraryRouteListTest`), `tests/Unit/Library/{BookshelfPolicyTest,BookPolicyTest,IsbnTest}.php`, Vitest `pages/Library/Books/{Index,Show}.test.ts`, `components/Library/BookForm.test.ts`, `pages/Library/Bookshelves/Index.test.ts`, `DashboardLayout.library.test.ts`, Playwright `tests/e2e/book.spec.ts`.
 
+#### Library : Google Books (F07)
+- `google_books_requests` (journal, une ligne par appel sortant) : `id`, `user_id` (FK nulle, `nullOnDelete`), `type` (`GoogleBooksRequestType` : `isbn` recherche, `volume` confirmation à l'enregistrement, `cover` image), `query` (255 : ISBN, identifiant du volume, ou hôte+chemin de l'image sans query string), `status`, `http_status` (nul sans réponse), `duration_ms`, horodatage ; index sur `created_at` seulement. Migration `2026_11_17_*_create_google_books_requests_table.php`, modèle `app/Models/Library/GoogleBooksRequest.php`.
+- Statuts `app/Enums/Library/GoogleBooksRequestStatus.php` : `found`, `not_found` (aussi 404 HTTP), `rate_limited` (429 Google ou budget d'enregistrement épuisé), `client_error`, `server_error`, `timeout` (aussi toute `ConnectionException`), `invalid_response` (JSON invalide, redirection, fichier non image), `storage_failed` (écriture de la couverture impossible), `refused` (URL ou taille refusée avant tout appel, sans code HTTP). `fromFailedHttpStatus()` traduit un code HTTP.
+- `app/Services/Library/GoogleBooksService.php` : `findByIsbn(isbn, User): ?GoogleBooksVolume` (premier volume de `q=isbn:`, le met en cache) ; `trustedVolume(id, User)` (cache sinon `volumes/<id>`, `ValidationException` sur `google_volume_id` si introuvable, indisponible ou budget épuisé). Cache serveur `google-books:volume:<id>` = réponse brute, `cache_minutes`. Tout appel passe par `journaled()` (envoi, statut, journal).
+- `GoogleBooksVolume` (lecture seule : `id`, `title`, `author`, `coverUrl`, `raw`), `GoogleBooksUnavailableException` (statut + message français, porte le 503), `GoogleBooksJournal::record()`.
+- `GoogleBooksCoverPolicy` : `allows(url)` (https, hôte exact de `cover_hosts`, ni identifiants ni port) et `largestCover(imageLinks)` (relève `http://` en `https://` seulement pour un hôte autorisé).
+- `GoogleBooksCoverService::store(volume, User): ?string` : télécharge puis délègue à `BookCoverService::store()` ; `null` sur tout échec (journalisé).
+- `GoogleBooksSaveLimiter::attempt(User)` : budget par membre des appels faits pendant un enregistrement (`save_calls_per_minute`), clé `google-books-save:<id>` ; distinct du limiteur de route `google-books`. Un volume en cache ne consomme rien.
+- `BookCoverInput` (`file`, `remove`, `fromGoogle`) : entrée « couverture » de `BookService::create|update`, qui renvoie un `SavedBook` (`book`, `googleCoverMissing` pour le toast). `BookService` résout le volume de confiance avant toute écriture.
+- `BookRequest` : `google_volume_id` (regex `^[A-Za-z0-9_-]{1,64}$`) et `use_google_cover` ; `googleVolumeId()`, `coverInput()`. Un `google_books_data` posté est ignoré (pas dans `Fillable`).
+- `app/Http/Controllers/Library/GoogleBooksLookupController.php` (invocable, `GET /library/google-books`, route `library.google-books.lookup`, `throttle:google-books`), `LookupGoogleBooksRequest` (ISBN normalisé + règle `Isbn`), `GoogleBooksLookupResource` (exactement `volume_id`, `title`, `author`, `cover_url`). Réponses : 404 aucun livre, 503 quota ou panne, 422 ISBN, 429 limiteur.
+- Front : `composables/useGoogleBooksLookup.ts` (`fetch` same-origin, messages français selon le statut), `components/Library/BookForm.vue` (bouton « Rechercher », encart « Trouvé sur Google Books » fermable, encart de conflit « Remplacer » / « Garder ma saisie », aperçu avec « Ne pas utiliser cette couverture »), type `GoogleBooksLookup` dans `types/library.ts`.
+- Tests : `tests/Feature/Library/{GoogleBooksService,GoogleBooksCoverService,GoogleBooksLookup,SaveBookFromGoogleBooks}Test.php`, `useGoogleBooksLookup.test.ts`, `BookForm.googleBooks.test.ts` ; helpers `googleVolume()`, `googleSearch()`, `jpegBytes()` dans `tests/Pest.php`.
+
 ### Garage
 - Rien encore (F09, F10).
 
 ### Fichiers de test partagés
-- `tests/Pest.php` : `inertiaHeaders()`, `bookshelfNames(User)` (vérifie aussi les positions 1..n), `signIn()`, `transparentPng(w, h)`, `storedImage($path)` (largeur, hauteur, MIME d'une image du disque `public`) ; `RefreshDatabase` sur `Feature`.
+- `tests/Pest.php` : `inertiaHeaders()`, `bookshelfNames(User)` (vérifie aussi les positions 1..n), `signIn()`, `transparentPng(w, h)`, `jpegBytes(w, h)`, `storedImage($path)` (largeur, hauteur, MIME d'une image du disque `public`), `googleVolume()` / `googleSearch()` (réponses Google factices) ; `RefreshDatabase` sur `Feature`.
 - `tests/TestCase.php` : `withoutVite()` + remise à zéro de Ziggy avant chaque test.
 - `resources/js/test/{mountWithUi,setup,testPage}.ts` : voir recettes.
 
@@ -124,6 +140,16 @@
 ### Afficher un toast
 1. Serveur : `Inertia::flash('toast', ['type' => 'success'|'error', 'message' => '…'])` puis `to_route(...)`.
 2. Front : rien à faire, `DashboardLayout` monte `useFlashToasts()`. Les pages d'auth (`AuthLayout`) n'ont pas de toast : utiliser `with('status', …)` et l'`UAlert` de la page.
+
+### Appeler une API externe en sécurité (F07, modèle : Google Books)
+1. Config dans `config/services.php` (clé, `base_url`, délais, liste d'hôtes) ; `config()` partout, clé optionnelle ajoutée seulement si non vide (`withKey()`).
+2. Client `Http::baseUrl()->withoutRedirecting()->timeout()->connectTimeout()->acceptJson()` : une redirection est une réponse inattendue, jamais suivie (elle enverrait la clé ailleurs).
+3. Appel par le serveur seulement : le navigateur n'envoie qu'un identifiant validé (regex), le serveur relit la donnée de confiance (cache puis API) et ignore tout champ « données » posté.
+4. Toute réponse inattendue (JSON invalide, type de champ faux, champ requis absent) lève une exception de domaine avec un statut ; l'appelant la traduit en message français (503) sans exposer le détail.
+5. Journaliser chaque appel (`GoogleBooksJournal`, succès comme échec, y compris les refus avant appel) : type, requête sans secret, statut, code HTTP, durée, membre.
+6. Deux limiteurs : un de route par membre (JSON 429) et un budget pour les appels faits pendant un enregistrement (`GoogleBooksSaveLimiter`).
+7. Télécharger un fichier distant : URL vérifiée par une liste d'hôtes exacts (`GoogleBooksCoverPolicy`), redirections suivies à la main (3 max, mêmes règles), taille bornée de trois façons, type lu dans les octets, puis `BookCoverService::store()`. Un échec ne bloque pas l'enregistrement.
+8. Tests : `Http::preventStrayRequests()` + `Http::fake()` dans chaque fichier, clé et en-têtes vérifiés avec `Http::assertSent`.
 
 ### Écrire un test Pest
 - Utiliser `Pest\Laravel\get|post|patch|delete|actingAs` et `signIn()` (pas `$this->get()`).
@@ -176,6 +202,13 @@
 - Couvertures : JPEG réencodé, 800 px max, sans EXIF ; limites 10 Mo et 6000 px de côté, types JPEG/PNG/WebP seulement (pas de GIF ni SVG) (F06).
 - Livre : liste triée par titre puis id ; filtre `?bookshelf=<id>` sur une étagère inconnue ou d'un autre = 404 ; étagère d'un autre dans `bookshelf_ids` = erreur de validation (n'en révèle pas l'existence) (F06).
 - Après création ou modification : retour sur la fiche ; après suppression : retour sur la liste (F06).
+- Google Books : on retient le **premier volume** de `q=isbn:<isbn>` ; pas de choix entre résultats ni de recherche par titre (F07).
+- Le navigateur n'envoie que `google_volume_id` ; `google_books_data` vient toujours du serveur (cache 30 min ou nouvel appel) (F07).
+- Préremplissage : jamais d'écrasement d'une saisie différente ; l'encart « Remplacer » / « Garder ma saisie » décide, le lien au volume et la couverture proposée restent dans les deux cas (F07).
+- Couverture Google en échec : non bloquante (livre enregistré sans couverture, ancienne gardée en modification, toast complété) ; un fichier envoyé gagne toujours sur la couverture Google (F07).
+- Volume non confirmable à l'enregistrement (Google en panne, budget épuisé) : enregistrement refusé avec erreur sur `google_volume_id` ; fermer l'encart Google permet d'enregistrer à la main (F07).
+- Sans `google_volume_id`, les données brutes existantes sont conservées ; un nouveau volume les remplace (F07).
+- Données Google et URL de couverture distantes jamais exposées au front ni stockées : seule la réponse du endpoint `{volume_id, title, author, cover_url}` sort (F07).
 - `route()` du front vient de `ziggy-js` (`skip-route-function`), en URL relative (`false`) (F01).
 - `Fortify` : fonctionnalité `resetPasswords()` uniquement ; routes d'auth écrites dans `routes/web.php` ; `laravel/passkeys` est présent mais inactif (F02).
 - Pas de Playwright hors parcours clés ; `tests/e2e/login.spec.ts` (F02) et `tests/e2e/book.spec.ts` (étagère puis livre, F06) ; job CI `e2e`.
@@ -206,6 +239,17 @@
 - `UploadedFile::fake()->image()` est opaque : `transparentPng()` pour tester le fond blanc.
 - Étagère d'un autre dans `bookshelf_ids` : `Rule::exists(...)->where('user_id', …)` obligatoire, sinon on range son livre sur l'étagère d'un autre.
 
+### Appels externes et Google Books (relevés en relecture F07)
+- SSRF : ne télécharger qu'en https, hôte exact de `cover_hosts`, sans identifiants ni port ; refuser aussi chaque redirection non conforme, **avant** toute requête vers l'hôte. Google liste ses images en `http://` : relever en https seulement pour un hôte autorisé.
+- `withoutRedirecting()` sur le client API (sinon la clé suit la redirection) ; la clé n'apparaît ni dans le journal (ISBN, identifiant, hôte+chemin sans query string), ni dans une réponse, ni dans Ziggy ; ne pas journaliser ni rapporter l'exception de connexion ou l'URL complète d'une requête.
+- Bombe gzip : télécharger avec `Accept-Encoding: identity` et `decode_content => false`, sinon le plafond de 2 Mo ne porte pas sur les octets réels ; contrôler `Content-Length`, l'option `progress` de Guzzle et la taille lue (seuls les deux derniers sont testables avec `Http::fake()`).
+- MySQL réordonne les clés d'un JSON stocké : comparer `google_books_data` avec `toEqual`, jamais `toBe`, sinon vert en SQLite et rouge en CI.
+- Type d'image lu dans les octets (`getimagesizefromstring`, JPEG/PNG/WebP, 6000 px) : ne pas se fier au `Content-Type` ; HTML, SVG et GIF refusés.
+- Un appel qui part pendant un enregistrement (volume absent du cache, couverture) consomme `GoogleBooksSaveLimiter` ; un nouvel appel externe dans `BookService` doit faire de même.
+- Toute exception autre que `ValidationException` à l'écriture de la couverture devient `storage_failed` (livre enregistré sans couverture) ; ne pas la laisser remonter en 500.
+- `ConnectionException` (délai, DNS, refus) est journalisée `timeout`, un 404 `not_found` ; ne pas les confondre avec `invalid_response`.
+- Tests : tout fichier Google Books pose `Http::preventStrayRequests()` ; un test de formulaire qui compare la charge utile exacte doit inclure `google_volume_id` et `use_google_cover` (deux tests de F06 complétés).
+
 ### Ziggy, Inertia, tests
 - Test Pest d'une page : Ziggy imprime sa liste une fois par processus PHP ; `tests/TestCase.php` la réinitialise (`BladeRouteGenerator::$generated`, `Ziggy::clearRoutes()`), ne pas retirer.
 - Requête Inertia dans un test sans `X-Inertia-Version` : le contrôle de version renvoie un 409 ; utiliser `inertiaHeaders()`.
@@ -231,14 +275,14 @@
 
 ## Notes pour les features à venir
 
-- F07 : `books.google_books_data` (JSON) et `books.isbn` existent déjà ; `Isbn::normalize()` / `Isbn` pour valider ; la couverture Google doit passer par `BookCoverService` (téléchargement puis `store`, jamais d'URL distante stockée) ; `BookForm.vue` est le point d'entrée du préremplissage ; `Http::fake()` pour les tests ; appels Google Books à journaliser pour F13.
-- F08 : le scan EAN-13 alimente le champ ISBN de `BookForm.vue`.
+- F08 : le scan EAN-13 alimente le champ ISBN de `BookForm.vue` ; le bouton « Rechercher » (`useGoogleBooksLookup`) exige un ISBN non vide et valide côté serveur, limité à 10 recherches/min par membre : un scan qui déclenche la recherche seul doit s'y plier.
 - F11 : `BookPolicy` n'autorise que le propriétaire (404 sinon) ; la lecture seule des autres membres demande une Policy de consultation distincte, sans toucher à `update`/`delete`. `BookResource` expose déjà `cover_url`.
 - F12 : source de recherche livres : `books` (titre, auteur, ISBN) ; index `user_id`+`title` seulement.
 - F10 : la Policy du modèle appartenant à un membre suit `BookshelfPolicy` (404 pour un autre membre) ; la lecture seule des autres membres arrive en F11, avec ses propres Policies de consultation.
 - F09 : le Garage copie le patron de F05 (`Garage/` : modèle, policy, service, requests, page, entrée de menu `navigation/modules/garage.ts`) ; l'ordre des étagères peut réutiliser la logique de position, à extraire seulement si le motif est dupliqué une deuxième fois.
 - F12 : chaque module fournit sa source de recherche globale ; `UDashboardSearch` a `:groups="[]"` et un texte « arrive bientôt » dans `DashboardLayout.vue` à remplacer.
 - F13 : la page de contrôle admin ira dans le groupe `admin` de Ziggy (`$adminRoutes`).
+- F13 : le journal `google_books_requests` (F07, modèle `App\Models\Library\GoogleBooksRequest`, statuts `GoogleBooksRequestStatus`) grossit sans fin : le purger (`Prunable` + durée de conservation configurable, `model:prune` planifié) ; un index `(status, created_at)` sera probablement utile pour les filtres de la page de contrôle (seul `created_at` est indexé aujourd'hui).
 - F14 : configurer `trustProxies` (sinon tous les visiteurs partagent la même IP dans les limiteurs) ; les liens d'invitation signés exigent la bonne config proxy/HTTPS ; masquer `signature` dans les logs Nginx.
 - Les comptes ne peuvent pas être supprimés aujourd'hui ; les étagères se suppriment en cascade avec le compte.
 - Si un jour un compte peut être supprimé, supprimer aussi ses couvertures (`books.cover_path` ; la cascade SQL ne nettoie pas le disque).

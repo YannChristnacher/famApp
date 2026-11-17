@@ -97,6 +97,8 @@ describe('Library/BookForm', () => {
       bookshelf_ids: [9, 2],
       cover,
       remove_cover: false,
+      google_volume_id: null,
+      use_google_cover: false,
     })
   })
 
@@ -160,6 +162,8 @@ describe('Library/BookForm', () => {
       bookshelf_ids: [4, 9],
       cover: null,
       remove_cover: false,
+      google_volume_id: null,
+      use_google_cover: false,
     })
   })
 

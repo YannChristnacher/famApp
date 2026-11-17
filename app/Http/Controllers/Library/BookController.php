@@ -12,6 +12,7 @@ use App\Models\Library\Book;
 use App\Models\User;
 use App\Services\Library\BookService;
 use App\Services\Library\BookshelfService;
+use App\Services\Library\SavedBook;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -55,9 +56,15 @@ class BookController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        $book = $this->books->create($user, $request->bookAttributes(), $request->bookshelfIds(), $request->cover());
+        $saved = $this->books->create(
+            $user,
+            $request->bookAttributes(),
+            $request->bookshelfIds(),
+            $request->coverInput(),
+            $request->googleVolumeId(),
+        );
 
-        return $this->toBook($book, "Le livre « {$book->title} » a été ajouté.");
+        return $this->toBook($saved, 'ajouté');
     }
 
     public function show(Book $book): Response
@@ -83,15 +90,15 @@ class BookController extends Controller
 
     public function update(UpdateBookRequest $request, Book $book): RedirectResponse
     {
-        $this->books->update(
+        $saved = $this->books->update(
             $book,
             $request->bookAttributes(),
             $request->bookshelfIds(),
-            $request->cover(),
-            $request->removesCover(),
+            $request->coverInput(),
+            $request->googleVolumeId(),
         );
 
-        return $this->toBook($book, "Le livre « {$book->title} » a été modifié.");
+        return $this->toBook($saved, 'modifié');
     }
 
     public function destroy(Book $book): RedirectResponse
@@ -112,10 +119,15 @@ class BookController extends Controller
         return BookshelfResource::collection($this->bookshelves->listFor($user))->resolve();
     }
 
-    private function toBook(Book $book, string $message): RedirectResponse
+    /**
+     * @param  'ajouté'|'modifié'  $action
+     */
+    private function toBook(SavedBook $saved, string $action): RedirectResponse
     {
+        $message = "Le livre « {$saved->book->title} » a été {$action}";
+        $message .= $saved->googleCoverMissing ? ', mais la couverture Google Books n’a pas pu être récupérée.' : '.';
         Inertia::flash('toast', ['type' => 'success', 'message' => $message]);
 
-        return to_route('library.books.show', $book);
+        return to_route('library.books.show', $saved->book);
     }
 }

@@ -35,4 +35,21 @@ return [
         ],
     ],
 
+    /*
+    | Google Books, called by the server only (App\Services\Library\GoogleBooksService).
+    | The API key is optional: without it, Google applies its anonymous quota.
+    | Cover images are downloaded only over https from the hosts listed here.
+    */
+    'google_books' => [
+        'key' => env('GOOGLE_BOOKS_API_KEY'),
+        'base_url' => env('GOOGLE_BOOKS_BASE_URL', 'https://www.googleapis.com/books/v1'),
+        'timeout' => 5,
+        'cache_minutes' => 30,
+        // Calls made while saving books (volume confirmation, cover download), per member.
+        'save_calls_per_minute' => 20,
+        'cover_hosts' => ['books.google.com', 'books.googleusercontent.com'],
+        'cover_max_kilobytes' => 2048,
+        'cover_timeout' => 5,
+    ],
+
 ];
