@@ -135,7 +135,7 @@
 
 ### Uploader une image (F06)
 - Validation : `File::image()->types([...])->max(Ko)` + `Rule::dimensions()->maxWidth/maxHeight` (borne la mémoire de GD) ; modèle `BookRequest`.
-- Stockage : `BookCoverService` (GD natif, réduction à 800 px de large, orientation EXIF après réduction, réencodage JPEG sur fond blanc, nom aléatoire, disque `public`). Fichier écrit avant la transaction, supprimé si elle échoue ; l'ancien fichier supprimé après (`BookService::withNewCover`).
+- Stockage : `BookCoverService` (GD natif, réduction à 800 px de large, orientation EXIF appliquée après réduction mais prise en compte pour la largeur cible (largeur après rotation), décodage selon le type (`imagecreatefromjpeg|png|webp`), réencodage JPEG sur fond blanc, nom aléatoire, disque `public`). Fichier écrit avant la transaction, supprimé si elle échoue ; l'ancien fichier supprimé après (`BookService::withNewCover`).
 - Front : `UFileUpload` (`v-model` `File | null`, aperçu intégré) dans un `useForm` : Inertia passe en FormData tout seul ; une modification avec fichier part en `form.transform(d => ({ ...d, _method: 'patch' })).post(...)` (PHP ne lit pas le multipart en PATCH).
 - Tests : `Storage::fake('public')`, `UploadedFile::fake()->image()`, helpers `storedImage()` et `transparentPng()` de `tests/Pest.php` ; Vitest : définir `URL.createObjectURL` (absent de jsdom) pour l'aperçu.
 
@@ -211,3 +211,4 @@
 - F13 : la page de contrôle admin ira dans le groupe `admin` de Ziggy (`$adminRoutes`).
 - F14 : configurer `trustProxies` (sinon tous les visiteurs partagent la même IP dans les limiteurs) ; les liens d'invitation signés exigent la bonne config proxy/HTTPS ; masquer `signature` dans les logs Nginx.
 - Les comptes ne peuvent pas être supprimés aujourd'hui ; les étagères se suppriment en cascade avec le compte.
+- Si un jour un compte peut être supprimé, supprimer aussi ses couvertures (la cascade SQL ne nettoie pas le disque).

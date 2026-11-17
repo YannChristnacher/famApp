@@ -65,3 +65,13 @@ Notes d'implémentation :
 - Tests F05 ajustés (aucun retiré) : `BookshelfIndexTest` et `BookshelfAccessTest` attendent maintenant la redirection de `/library` vers `library.books.index` ; `LibraryRouteListTest` liste aussi les routes `library.books.*`.
 - La suppression d'une étagère détache ses livres par la cascade de la clé étrangère du pivot (aucun code dans `BookshelfService`).
 - Les covers s'affichent via `public/storage` : en développement local, `php artisan storage:link` est nécessaire (l'image prod le fait déjà).
+
+## Relecture (2026-11-17)
+Relecteur indépendant : aucun point bloquant. Points mineurs corrigés sur la même branche :
+
+1. **Échec de la transaction** : tests qui font échouer l'enregistrement (`Book::saving` lève une exception) à la création et à la modification avec une nouvelle couverture : aucun nouveau fichier ne reste sur le disque, l'ancienne couverture est conservée (vérifié : les tests échouent si le nettoyage est retiré).
+2. **Métadonnées** : test qu'une photo source avec EXIF (Orientation et sous-répertoire GPS) donne un JPEG stocké sans aucune donnée EXIF.
+3. **Portrait enregistré de côté** : la largeur cible tient compte de l'orientation (pour un quart de tour, c'est la hauteur de la source qui devient la largeur) ; la réduction reste faite avant la rotation. 4032×3024 avec Orientation 6 ou 8 sort en 800×1067 (testé, ainsi qu'une petite photo de côté non agrandie).
+4. **Décodage** : `imagecreatefromjpeg|png|webp` depuis le chemin du fichier selon le type MIME détecté, au lieu de `file_get_contents` + `imagecreatefromstring` ; un autre type est refusé avec le même message français.
+
+Note ajoutée dans `doc/MEMORY.md` : supprimer les couvertures si la suppression de compte arrive un jour.
