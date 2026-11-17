@@ -13,6 +13,12 @@ $guestRoutes = [
 $authenticatedRoutes = [
     'home',
     'logout',
+    'library.index',
+    'library.bookshelves.index',
+    'library.bookshelves.store',
+    'library.bookshelves.update',
+    'library.bookshelves.destroy',
+    'library.bookshelves.move',
 ];
 
 // Printed only to administrators, on top of the signed-in routes.

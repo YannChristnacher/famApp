@@ -37,6 +37,24 @@ globalThis.Ziggy = {
     'password.update': { uri: 'reset-password', methods: ['POST'] },
     'account-request.create': { uri: 'account-request', methods: ['GET', 'HEAD'] },
     'account-request.store': { uri: 'account-request', methods: ['POST'] },
+    'library.index': { uri: 'library', methods: ['GET', 'HEAD'] },
+    'library.bookshelves.index': { uri: 'library/bookshelves', methods: ['GET', 'HEAD'] },
+    'library.bookshelves.store': { uri: 'library/bookshelves', methods: ['POST'] },
+    'library.bookshelves.update': {
+      uri: 'library/bookshelves/{bookshelf}',
+      methods: ['PUT', 'PATCH'],
+      parameters: ['bookshelf'],
+    },
+    'library.bookshelves.destroy': {
+      uri: 'library/bookshelves/{bookshelf}',
+      methods: ['DELETE'],
+      parameters: ['bookshelf'],
+    },
+    'library.bookshelves.move': {
+      uri: 'library/bookshelves/{bookshelf}/move',
+      methods: ['PATCH'],
+      parameters: ['bookshelf'],
+    },
     'admin.account-requests.index': { uri: 'admin/account-requests', methods: ['GET', 'HEAD'] },
     'admin.account-requests.account.create': {
       uri: 'admin/account-requests/{accountRequest}/account',

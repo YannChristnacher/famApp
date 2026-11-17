@@ -1,0 +1,75 @@
+# Feature: F05 — Bibliothèque : CRUD des étagères
+
+## Overview
+Ouvrir le module Library : chaque membre a une **bibliothèque**, qui n'est pas une table mais l'ensemble de ses **étagères**, qu'il nomme librement (« Fantasy », « Coup de cœur »…). La page « Ma bibliothèque » liste ses étagères dans son ordre et permet de les créer, renommer, supprimer (avec confirmation) et réordonner (boutons monter/descendre). Les livres viendront en F06.
+
+## Out of scope
+- Livres et rattachement aux étagères (F06).
+- Consultation des étagères des autres membres (F11) : la page ne montre que les étagères de l'utilisateur connecté.
+- Recherche globale (F12).
+- Glisser-déposer : aucune dépendance présente ne le permet simplement (pas de nouvelle dépendance), les boutons monter/descendre suffisent.
+- Parcours Playwright (réservé à connexion, ajout livre, ajout outil).
+
+## Acceptance criteria
+- [x] AC1: Given un invité, when il appelle `library.index`, `library.bookshelves.index`, `library.bookshelves.store`, `library.bookshelves.update`, `library.bookshelves.destroy` ou `library.bookshelves.move`, then il est redirigé vers `login` et rien ne change.
+- [x] AC2: Given un utilisateur connecté (user ou admin), when il ouvre `library.index` (`/library`), then il est redirigé vers `library.bookshelves.index` (`/library/bookshelves`), qui rend `Library/Bookshelves/Index` avec `bookshelves` = ses seules étagères (`id`, `name`, `position`) triées par position ; aucune étagère d'un autre utilisateur n'apparaît.
+- [x] AC3: Given des étagères existantes, when l'utilisateur poste un nom entouré d'espaces sur `library.bookshelves.store`, then l'étagère est créée pour lui avec le nom trimé, en dernière position (1 pour la première), et il est redirigé vers la liste avec le toast « L'étagère « <nom> » a été créée. ».
+- [x] AC4: Given le formulaire de création ou de renommage, when le nom est absent, vide après trim, dépasse 100 caractères ou existe déjà parmi ses étagères quelle que soit la casse et les espaces de bord, then une erreur française est renvoyée sur `name` et rien ne change ; given le même nom chez un autre utilisateur, then la création est acceptée ; given le renommage d'une étagère avec son propre nom en changeant la casse, then il est accepté.
+- [x] AC5: Given une de ses étagères, when il poste un nouveau nom sur `library.bookshelves.update`, then le nom (trimé) est enregistré, la position ne change pas, toast « L'étagère a été renommée en « <nom> ». ».
+- [x] AC6: Given trois étagères (positions 1, 2, 3), when il supprime celle du milieu, then elle disparaît et les autres ont les positions 1 et 2 dans le même ordre ; toast « L'étagère « <nom> » a été supprimée. ».
+- [x] AC7: Given trois étagères, when il demande `library.bookshelves.move` avec `direction` = `up` sur la deuxième, then elle passe en position 1 et la première en 2 ; `down` sur la deuxième l'échange avec la troisième ; `up` sur la première ou `down` sur la dernière ne change rien ; une `direction` absente ou hors `up`/`down` renvoie une erreur de validation et ne change rien. Les positions restent compactes (1..n).
+- [x] AC8: Given une étagère d'un autre utilisateur, when il appelle `update`, `destroy` ou `move` dessus, then la réponse est 404 et rien ne change (Policy `BookshelfPolicy`, refus en « introuvable » pour ne pas révéler l'existence) ; la Policy n'autorise `update`, `delete` et `move` qu'au propriétaire (testée unitairement).
+- [x] AC9: Given la liste Ziggy, when un utilisateur connecté charge une page, then `library.index` et les routes `library.bookshelves.*` sont exposées (groupe `auth`) ; when un invité charge une page, then aucune ne l'est.
+- [x] AC10 (Vitest): Given le registre de navigation, then il contient l'entrée « Bibliothèque » (`i-lucide-library-big`, `library.index`, `requiredRole: 'user'`, rôle que les admins ont aussi) ; given le `DashboardLayout`, then elle est visible pour un user et un admin, et active sur `/library/bookshelves`.
+- [x] AC11 (Vitest): Given la page avec des étagères, then elles sont listées dans l'ordre reçu ; sans étagère, then le texte « Votre bibliothèque est vide. » et une invitation à créer la première étagère s'affichent.
+- [x] AC12 (Vitest): Given la page, when on saisit un nom et soumet le formulaire de création, then un `POST` vers `/library/bookshelves` est envoyé avec `name` ; une erreur serveur s'affiche sous le champ ; le champ est vidé après succès.
+- [x] AC13 (Vitest): Given la page, when on clique « Renommer » sur une étagère, then une `UModal` s'ouvre avec le nom prérempli ; à la soumission, un `PATCH` vers `/library/bookshelves/<id>` est envoyé ; les erreurs s'affichent dans la modale.
+- [x] AC14 (Vitest): Given la page, when on clique « Supprimer », then une `UModal` de confirmation nommant l'étagère s'ouvre ; « Annuler » ne fait rien ; « Supprimer » envoie un `DELETE` vers `/library/bookshelves/<id>`.
+- [x] AC15 (Vitest): Given la page, then le bouton « Monter » de la première étagère et « Descendre » de la dernière sont désactivés ; un clic sur un bouton actif envoie un `PATCH` vers `/library/bookshelves/<id>/move` avec la direction.
+- [x] AC16: Given le code, when on lance `composer test`, `composer lint`, `npm run test`, `npm run lint`, `npm run build`, then tout passe, et la CI est verte.
+
+## Technical approach
+1. **Données** : migration `create_bookshelves_table` (`id`, `user_id` FK `cascadeOnDelete`, `name` string(100), `position` unsigned int, timestamps, index unique `user_id`+`name`, index `user_id`+`position`). Modèle `App\Models\Library\Bookshelf` (`#[Fillable(['name'])]`, `#[UsePolicy]`, `#[UseFactory]`), relation `user()`, `User::bookshelves()` (HasMany triée par position). Factory `Database\Factories\Library\BookshelfFactory` (position séquentielle par utilisateur).
+2. **Routes** (groupe `auth`, préfixe `/library`, noms `library.`) :
+   - `GET /library` → `Library\LibraryController` (invocable) → redirection vers `library.bookshelves.index` : point d'entrée du module (menu), F06 pourra en faire une vue d'ensemble ou ajouter `/library/books`.
+   - `GET /library/bookshelves` → `BookshelfController@index`
+   - `POST /library/bookshelves` → `store` ; `PATCH /library/bookshelves/{bookshelf}` → `update` ; `DELETE /library/bookshelves/{bookshelf}` → `destroy`
+   - `PATCH /library/bookshelves/{bookshelf}/move` → `BookshelfPositionController@update` (`library.bookshelves.move`)
+3. **Validation** : `StoreBookshelfRequest` / `UpdateBookshelfRequest` (trim du nom en `prepareForValidation`, `required|string|max:100`, règle `App\Rules\Library\UniqueBookshelfName` : comparaison insensible à la casse avec `mb_strtolower` sur les noms de l'utilisateur, en ignorant l'étagère renommée — collection Eloquent, pas de SQL brut, identique en SQLite et MySQL) ; `MoveBookshelfRequest` (`direction` requis, `Rule::enum(BookshelfMoveDirection::class)`). Les requêtes de modification autorisent via la Policy (`authorize()`), donc 404 avant toute validation. Attribut `direction` traduit dans `lang/fr/validation.php`.
+4. **Policy** `App\Policies\Library\BookshelfPolicy` : `update`, `delete`, `move` → propriétaire, sinon `Response::denyAsNotFound()`.
+5. **Service** `App\Services\Library\BookshelfService` : `listFor(User)`, `create(User, name)` (transaction, verrou sur les étagères de l'utilisateur, position = max + 1), `rename`, `delete` (transaction, recompactage), `move(Bookshelf, direction)` (transaction, échange avec la voisine puis recompactage 1..n). Une violation de l'index unique (course) devient une `ValidationException` sur `name`.
+6. **Contrôleurs minces** : appel du service, flash `toast` (mécanisme de F04), redirection vers la liste.
+7. **Ziggy** : routes ajoutées au groupe `auth` (donc à la liste par défaut `only`).
+8. **Front** :
+   - `navigation/modules/library.ts` (entrée « Bibliothèque », `i-lucide-library-big`, `requiredRole: 'user'` : tout membre connecté, admins compris, jamais un invité) ajouté au registre.
+   - `types/library.ts` (`Bookshelf`, `BookshelfMoveDirection`).
+   - `pages/Library/Bookshelves/Index.vue` : `DashboardLayout` (titre « Ma bibliothèque », fil d'Ariane Bibliothèque › Étagères), formulaire de création (`UForm`, `UFormField`, `UInput`, `UButton`), liste des étagères (`UCard`), état vide (`UEmpty` si disponible, sinon `UAlert`), boutons monter/descendre/renommer/supprimer (`UButton` + `UTooltip`).
+   - `components/Library/BookshelfRenameModal.vue` et `components/Library/BookshelfDeleteModal.vue` : `UModal` contrôlées (`v-model:open`).
+
+Hypothèses :
+- Longueur maximale du nom : 100 caractères. Seuls les espaces de bord sont retirés ; les espaces internes sont conservés tels quels.
+- Positions à partir de 1, compactes ; ordre secondaire par `id` pour être déterministe si des positions venaient à être égales (le recompactage les corrige au prochain changement).
+- Réordonnancement par un pas (monter/descendre) : un mouvement impossible (première vers le haut, dernière vers le bas) est un no-op silencieux, les boutons étant désactivés côté interface.
+- Refus d'accès aux étagères d'autrui en 404 (pas 403) pour ne pas révéler leur existence, sur toutes les routes qui prennent une étagère.
+- L'entrée de menu pointe vers `/library` (redirection) pour rester active sur toutes les sous-pages du module (`/library/bookshelves`, plus tard `/library/books`).
+- Supprimer un compte supprime ses étagères (cascade) ; aucune suppression de compte n'existe aujourd'hui.
+
+## Status
+- Branch: feature/F05-etageres-bibliotheque
+- Tests written: yes (tests/Feature/Library/*.php, tests/Unit/Library/BookshelfPolicyTest.php, resources/js/pages/Library/Bookshelves/Index.test.ts, resources/js/layouts/DashboardLayout.library.test.ts, resources/js/navigation/registry.test.ts)
+- Tests passing: yes en local (composer test, composer lint, npm run test, npm run lint, npm run build) ; AC16 confirmé par la CI de la PR #6 (jobs backend, frontend, e2e, docker verts).
+
+Notes d'implémentation :
+- `UpdateBookshelfRequest` et `MoveBookshelfRequest` autorisent via `Gate::inspect()` : le refus « introuvable » (404) passe avant la validation, donc une requête invalide sur l'étagère d'un autre ne révèle rien.
+- La suppression passe par `Gate::authorize('delete')` dans le contrôleur (pas de Form Request sans données).
+- Unicité : règle `UniqueBookshelfName` (comparaison PHP `mb_strtolower`) + index unique `user_id`/`name` en base ; une violation de l'index (requêtes simultanées) devient une erreur de validation sur `name` (testé en SQLite, sensible à la casse : la règle PHP couvre la casse).
+- Chaque modification d'ordre relit les étagères du propriétaire sous `lockForUpdate`, triées par position puis `id`, et renumérote 1..n (un modèle périmé ne casse pas l'ordre, testé).
+- Tests existants ajustés (aucun retiré) : `registry.test.ts` et `DashboardLayout.roles.test.ts` (nouvelle entrée « Bibliothèque »).
+- L'entrée de menu a `requiredRole: 'user'` (et non `null`) : `rolesOf()` donne `user` aux admins, et un invité ne la voit jamais.
+
+## Relecture (2026-11-17)
+Relecteur indépendant : aucun point bloquant. Points corrigés sur la même branche :
+
+1. **Unicité identique sur tous les moteurs.** L'index `(user_id, name)` était sensible à la casse sous SQLite et insensible aux accents sous MySQL (`utf8mb4_unicode_ci`), contrairement à la règle PHP. Remplacé par une colonne `normalized_name` (`Bookshelf::normalizeName()` : trim, espaces internes multiples réduits à un, minuscules `mb_strtolower`), remplie par le mutateur de `name`, avec l'index unique `(user_id, normalized_name)` ; sous MySQL la colonne est en `utf8mb4_bin`. **Décision : les accents comptent** (« Café » ≠ « Cafe », « Été » ≠ « Ete ») ; la casse des lettres accentuées est ignorée (« ÉTÉ » = « été »). La règle `UniqueBookshelfName` compare la même colonne. Le nom affiché garde ses espaces internes tels que saisis. Tests : doublon de casse ou d'espaces refusé par la base sans la règle, accents distincts acceptés, erreur de validation française dans les deux cas.
+2. **Course à la première création.** Chaque écriture (création, renommage, déplacement, suppression) ouvre une transaction et verrouille d'abord la ligne `users` du propriétaire (`User::query()->whereKey($id)->lockForUpdate()`), verrou commun qui existe même sans étagère. Testé en vérifiant que la première requête de chaque écriture est ce `select` (et qu'il finit par `for update` sous MySQL, en CI).
+3. **Positions sous index unique.** L'index `(user_id, position)` est désormais unique : la renumérotation pose d'abord les étagères qui changent au-dessus de toutes les positions, puis à leur place, sans doublon transitoire. Testé (deux étagères en même position refusées ; tous les tests de déplacement et suppression passent avec l'index).

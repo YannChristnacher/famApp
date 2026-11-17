@@ -6,6 +6,9 @@ use App\Http\Controllers\Auth\AccountRequestController;
 use App\Http\Controllers\Auth\AuthPageController;
 use App\Http\Controllers\Auth\InvitationController;
 use App\Http\Controllers\Core\HomeController;
+use App\Http\Controllers\Library\BookshelfController;
+use App\Http\Controllers\Library\BookshelfPositionController;
+use App\Http\Controllers\Library\LibraryController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
 use Laravel\Fortify\Http\Controllers\NewPasswordController;
@@ -50,6 +53,14 @@ Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
     Route::get('/', HomeController::class)->name('home');
+
+    Route::prefix('library')->name('library.')->group(function () {
+        Route::get('/', LibraryController::class)->name('index');
+
+        Route::resource('bookshelves', BookshelfController::class)->only(['index', 'store', 'update', 'destroy']);
+        Route::patch('/bookshelves/{bookshelf}/move', [BookshelfPositionController::class, 'update'])
+            ->name('bookshelves.move');
+    });
 });
 
 Route::middleware(['auth', 'can:admin'])->prefix('admin')->name('admin.')->group(function () {

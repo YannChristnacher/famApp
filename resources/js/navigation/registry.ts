@@ -2,12 +2,14 @@ import type { NavigationMenuItem } from '@nuxt/ui'
 import type { NavigationEntry, NavigationResolvers } from './types'
 import { adminNavigation } from './modules/admin'
 import { coreNavigation } from './modules/core'
+import { libraryNavigation } from './modules/library'
 
 /**
  * Every module declares its entries in `modules/<module>.ts` and adds them here.
  */
 export const navigationRegistry: NavigationEntry[] = [
   ...coreNavigation,
+  ...libraryNavigation,
   ...adminNavigation,
 ]
 

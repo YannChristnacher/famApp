@@ -5,6 +5,7 @@ Inventaire familial partagé : chaque membre montre aux autres ses **livres** (m
 - Cadrage complet : https://claude.ai/artifact/BXrka7SFLUnJgpQhyAmt6D
 - Avancement : `doc/BACKLOG.md` (à mettre à jour à chaque changement de statut)
 - Plans de features : `doc/features/<id>-<slug>.md`
+- Mémoire partagée : `doc/MEMORY.md` (carte du code, recettes, décisions, pièges) — **à lire avant d'explorer le code** ; mise à jour à chaque feature par l'agent scribe
 
 ## Stack
 

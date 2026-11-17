@@ -191,6 +191,7 @@ return [
         'day'                      => 'jour',
         'deleted_at'               => 'date de suppression',
         'description'              => 'description',
+        'direction'                => 'direction',
         'display_type'             => 'type d\'affichage',
         'district'                 => 'quartier',
         'duration'                 => 'durée',
