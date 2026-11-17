@@ -19,6 +19,13 @@ $authenticatedRoutes = [
     'library.bookshelves.update',
     'library.bookshelves.destroy',
     'library.bookshelves.move',
+    'library.books.index',
+    'library.books.create',
+    'library.books.store',
+    'library.books.show',
+    'library.books.edit',
+    'library.books.update',
+    'library.books.destroy',
 ];
 
 // Printed only to administrators, on top of the signed-in routes.

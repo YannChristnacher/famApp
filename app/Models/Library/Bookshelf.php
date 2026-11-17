@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -71,6 +72,16 @@ class Bookshelf extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Deleting the bookshelf removes these links, never the books.
+     *
+     * @return BelongsToMany<Book, $this>
+     */
+    public function books(): BelongsToMany
+    {
+        return $this->belongsToMany(Book::class)->orderBy('title')->orderBy('books.id');
     }
 
     public function isOwnedBy(User $user): bool
