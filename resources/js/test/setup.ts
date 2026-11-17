@@ -63,6 +63,12 @@ globalThis.Ziggy = {
     'library.books.update': { uri: 'library/books/{book}', methods: ['PUT', 'PATCH'], parameters: ['book'] },
     'library.books.destroy': { uri: 'library/books/{book}', methods: ['DELETE'], parameters: ['book'] },
     'library.google-books.lookup': { uri: 'library/google-books', methods: ['GET', 'HEAD'] },
+    'garage.index': { uri: 'garage', methods: ['GET', 'HEAD'] },
+    'garage.shelves.index': { uri: 'garage/shelves', methods: ['GET', 'HEAD'] },
+    'garage.shelves.store': { uri: 'garage/shelves', methods: ['POST'] },
+    'garage.shelves.update': { uri: 'garage/shelves/{shelf}', methods: ['PUT', 'PATCH'], parameters: ['shelf'] },
+    'garage.shelves.destroy': { uri: 'garage/shelves/{shelf}', methods: ['DELETE'], parameters: ['shelf'] },
+    'garage.shelves.move': { uri: 'garage/shelves/{shelf}/move', methods: ['PATCH'], parameters: ['shelf'] },
     'admin.account-requests.index': { uri: 'admin/account-requests', methods: ['GET', 'HEAD'] },
     'admin.account-requests.account.create': {
       uri: 'admin/account-requests/{accountRequest}/account',

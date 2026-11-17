@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Models\Garage\ToolShelf;
 use App\Models\Library\Bookshelf;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -45,6 +46,23 @@ function bookshelfNames(User $user): array
     expect($bookshelves->pluck('position')->all())->toBe($bookshelves->isEmpty() ? [] : range(1, $bookshelves->count()));
 
     return $bookshelves->pluck('name')->values()->all();
+}
+
+/**
+ * Names of the tool shelves of a user, in their order (positions must be 1..n).
+ *
+ * @return list<string>
+ */
+function toolShelfNames(User $user): array
+{
+    $shelves = ToolShelf::query()
+        ->whereBelongsTo($user)
+        ->orderBy('position')
+        ->get();
+
+    expect($shelves->pluck('position')->all())->toBe($shelves->isEmpty() ? [] : range(1, $shelves->count()));
+
+    return $shelves->pluck('name')->values()->all();
 }
 
 /**
