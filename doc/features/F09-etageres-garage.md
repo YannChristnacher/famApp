@@ -28,7 +28,7 @@ Ouvrir le module Garage, pendant exact de F05 (étagères de la bibliothèque) :
 - [x] AC15 (Vitest): Given la page, when on clique « Renommer », then une `UModal` préremplie s'ouvre et envoie un `PATCH` vers `/garage/shelves/<id>` ; les erreurs s'affichent dans la modale. When on clique « Supprimer », then une `UModal` de confirmation nommant l'étagère s'ouvre ; « Annuler » ne fait rien ; « Supprimer » envoie un `DELETE` vers `/garage/shelves/<id>`.
 - [x] AC16 (Vitest): Given la page, then « Monter » de la première et « Descendre » de la dernière sont désactivés (les deux pour une étagère seule) ; un clic actif envoie un `PATCH` vers `/garage/shelves/<id>/move` avec la direction, et les déplacements sont bloqués jusqu'à la fin de la requête.
 - [x] AC17: Given les tests de F05, when on lance la suite, then ils passent sans modification (les parties extraites gardent le même comportement).
-- [ ] AC18: Given le code, when on lance `composer test`, `composer lint`, `npm run test`, `npm run lint`, `npm run build`, then tout passe, et la CI est verte.
+- [x] AC18: Given le code, when on lance `composer test`, `composer lint`, `npm run test`, `npm run lint`, `npm run build`, then tout passe, et la CI est verte.
 
 ## Technical approach
 1. **Données** : migration `create_tool_shelves_table` : `id`, `user_id` (FK `cascadeOnDelete`), `name` string(100), `normalized_name` string(100) (`utf8mb4_bin` sous MySQL seulement), `position` unsigned int, timestamps ; uniques `(user_id, normalized_name)` et `(user_id, position)`. Modèle `App\Models\Garage\ToolShelf` (`#[Fillable(['name'])]`, `#[UseFactory]`, `#[UsePolicy]`, mutateur de `name` qui remplit `normalized_name`, `isOwnedBy()`), `User::toolShelves()` (HasMany triée position puis id). Factory `Database\Factories\Garage\ToolShelfFactory` (position suivante du membre).
@@ -65,7 +65,7 @@ Hypothèses :
 ## Status
 - Branch: feature/F09-etageres-garage
 - Tests written: yes (tests/Feature/Garage/*.php, tests/Unit/Garage/ToolShelfPolicyTest.php, tests/Unit/Core/NormalizedNameTest.php, resources/js/pages/Garage/Shelves/Index.test.ts, resources/js/layouts/DashboardLayout.garage.test.ts ; registry.test.ts et DashboardLayout.roles.test.ts mis à jour)
-- Tests passing: yes en local (composer test, composer lint, npm run test, npm run lint, npm run build) ; AC18 en attente de la CI (MySQL : collation `utf8mb4_bin` et `for update`).
+- Tests passing: yes en local (composer test, composer lint, npm run test, npm run lint, npm run build) ; AC18 confirmé par la CI de la PR #10 (jobs backend MySQL, frontend, e2e, docker verts : collation `utf8mb4_bin` et `for update` vérifiés).
 
 Notes d'implémentation :
 - Tests de F05 non modifiés et verts après l'extraction (`git diff main -- tests/Feature/Library tests/Unit/Library` vide).
@@ -73,3 +73,9 @@ Notes d'implémentation :
 - `NormalizedName` conserve exactement le comportement de F05 (`\s` sans UCP : l'espace insécable n'est pas réduit), pour ne pas rendre obsolètes les `normalized_name` déjà stockés.
 - Test d'existence 404 étendu à `update`, `destroy` et `move` (F05 ne testait que `update`).
 - Test « nom identique à une étagère de la bibliothèque accepté » et page du garage sans les étagères de la bibliothèque (isolation des modules).
+
+## Relecture (2026-11-17)
+Relecteur indépendant : aucun point bloquant. Ajouts sur la même branche :
+
+1. **Test croisé entre modules** (`tests/Feature/Garage/ShelfModulesIsolationTest.php`) : l'id d'une étagère de bibliothèque qui n'existe pas comme étagère du garage répond 404 sur `garage.shelves.update`, `destroy` et `move`, sans toucher l'étagère de bibliothèque ; symétrique côté bibliothèque (id d'une étagère du garage sur `library.bookshelves.*` → 404, garage inchangé).
+2. AC18 coché, statut mis à jour (CI verte).
