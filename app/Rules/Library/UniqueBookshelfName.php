@@ -8,9 +8,9 @@ use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 
 /**
- * A member cannot have two bookshelves with the same name, whatever the case
- * (the name is trimmed before validation). Compared in PHP so that SQLite and
- * MySQL behave the same.
+ * A member cannot have two bookshelves with the same normalized name
+ * (Bookshelf::normalizeName(): case and repeated spaces ignored, accents
+ * count), the same comparison as the unique index on normalized_name.
  */
 class UniqueBookshelfName implements ValidationRule
 {
@@ -26,17 +26,12 @@ class UniqueBookshelfName implements ValidationRule
         }
 
         $duplicate = $this->owner->bookshelves()
+            ->where('normalized_name', Bookshelf::normalizeName($value))
             ->when($this->ignored, fn ($query, Bookshelf $ignored) => $query->whereKeyNot($ignored->getKey()))
-            ->pluck('name')
-            ->first(fn (string $name) => self::normalize($name) === self::normalize($value));
+            ->value('name');
 
         if ($duplicate !== null) {
             $fail("Vous avez déjà une étagère nommée « {$duplicate} ».");
         }
-    }
-
-    private static function normalize(string $name): string
-    {
-        return mb_strtolower(trim($name));
     }
 }

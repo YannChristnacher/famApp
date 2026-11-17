@@ -8,6 +8,7 @@ use Database\Factories\Library\BookshelfFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Attributes\UsePolicy;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,11 +16,16 @@ use Illuminate\Support\Carbon;
 
 /**
  * A shelf a member names freely; the library of a member is the set of their
- * bookshelves, ordered by position (1..n).
+ * bookshelves, ordered by position (1..n, unique per member).
+ *
+ * The name is unique per member once normalized (normalized_name, kept in
+ * sync by the name mutator): case and repeated spaces are ignored, accents
+ * count.
  *
  * @property int $id
  * @property int $user_id
  * @property string $name
+ * @property string $normalized_name
  * @property int $position
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -42,6 +48,21 @@ class Bookshelf extends Model
             'user_id' => 'integer',
             'position' => 'integer',
         ];
+    }
+
+    public static function normalizeName(string $name): string
+    {
+        return mb_strtolower((string) preg_replace('/\s+/u', ' ', trim($name)));
+    }
+
+    /**
+     * @return Attribute<string, string>
+     */
+    protected function name(): Attribute
+    {
+        return Attribute::make(
+            set: fn (string $value) => ['name' => $value, 'normalized_name' => self::normalizeName($value)],
+        );
     }
 
     /**

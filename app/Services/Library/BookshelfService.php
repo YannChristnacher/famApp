@@ -13,8 +13,10 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Bookshelves of a member and their order: positions always run from 1 to n.
- * Every change locks the bookshelves of the owner, so that two concurrent
- * requests cannot mix up the positions.
+ *
+ * Every write first locks the row of the owner in `users`: it is the common
+ * lock of all the writes on their bookshelves, which exists even before the
+ * first bookshelf (locking the bookshelves themselves would lock nothing then).
  */
 class BookshelfService
 {
@@ -28,20 +30,20 @@ class BookshelfService
 
     public function create(User $user, string $name): Bookshelf
     {
-        return $this->guardingUniqueName(fn () => DB::transaction(function () use ($user, $name) {
-            $lastPosition = $this->lockedBookshelvesOf($user->id)->max('position') ?? 0;
+        return $this->writingFor($user->id, function () use ($user, $name) {
+            $lastPosition = $this->bookshelvesOf($user->id)->max('position') ?? 0;
 
             $bookshelf = $user->bookshelves()->make(['name' => $name]);
             $bookshelf->position = $lastPosition + 1;
             $bookshelf->save();
 
             return $bookshelf;
-        }));
+        });
     }
 
     public function rename(Bookshelf $bookshelf, string $name): Bookshelf
     {
-        return $this->guardingUniqueName(function () use ($bookshelf, $name) {
+        return $this->writingFor($bookshelf->user_id, function () use ($bookshelf, $name) {
             $bookshelf->update(['name' => $name]);
 
             return $bookshelf;
@@ -50,10 +52,9 @@ class BookshelfService
 
     public function delete(Bookshelf $bookshelf): void
     {
-        DB::transaction(function () use ($bookshelf) {
-            $remaining = $this->lockedBookshelvesOf($bookshelf->user_id)
-                ->reject(fn (Bookshelf $other) => $other->is($bookshelf))
-                ->values();
+        $this->writingFor($bookshelf->user_id, function () use ($bookshelf) {
+            $remaining = $this->bookshelvesOf($bookshelf->user_id)
+                ->reject(fn (Bookshelf $other) => $other->is($bookshelf));
 
             $bookshelf->delete();
             $this->savePositions($remaining);
@@ -65,8 +66,8 @@ class BookshelfService
      */
     public function move(Bookshelf $bookshelf, BookshelfMoveDirection $direction): void
     {
-        DB::transaction(function () use ($bookshelf, $direction) {
-            $ordered = $this->lockedBookshelvesOf($bookshelf->user_id)->values()->all();
+        $this->writingFor($bookshelf->user_id, function () use ($bookshelf, $direction) {
+            $ordered = $this->bookshelvesOf($bookshelf->user_id)->values()->all();
             $index = collect($ordered)->search(fn (Bookshelf $other) => $other->is($bookshelf));
             $target = $index === false ? false : $index + $direction->offset();
 
@@ -79,48 +80,68 @@ class BookshelfService
     }
 
     /**
+     * Runs a write in a transaction holding the lock on the owner; a duplicate
+     * name caught by the unique index is reported as a validation error.
+     *
+     * @template T
+     *
+     * @param  Closure(): T  $write
+     * @return T
+     */
+    private function writingFor(int $userId, Closure $write): mixed
+    {
+        try {
+            return DB::transaction(function () use ($userId, $write) {
+                User::query()->whereKey($userId)->lockForUpdate()->firstOrFail();
+
+                return $write();
+            });
+        } catch (UniqueConstraintViolationException $exception) {
+            if (! str_contains($exception->getMessage(), 'normalized_name')) {
+                throw $exception;
+            }
+
+            throw ValidationException::withMessages([
+                'name' => 'Vous avez déjà une étagère portant ce nom.',
+            ]);
+        }
+    }
+
+    /**
+     * Read under the lock on the owner.
+     *
      * @return Collection<int, Bookshelf>
      */
-    private function lockedBookshelvesOf(int $userId): Collection
+    private function bookshelvesOf(int $userId): Collection
     {
         return Bookshelf::query()
             ->where('user_id', $userId)
             ->orderBy('position')
             ->orderBy('id')
-            ->lockForUpdate()
             ->get();
     }
 
     /**
-     * Numbers the bookshelves 1..n in the given order, saving only those that changed.
+     * Numbers the bookshelves 1..n in the given order. The bookshelves that
+     * change place first go above every current and final position, so that
+     * no two bookshelves ever share a position (unique index user_id+position).
      *
      * @param  Collection<int, Bookshelf>  $ordered
      */
     private function savePositions(Collection $ordered): void
     {
-        $ordered->values()->each(function (Bookshelf $bookshelf, int $index) {
+        $ordered = $ordered->values();
+        $moving = $ordered->reject(fn (Bookshelf $bookshelf, int $index) => $bookshelf->position === $index + 1);
+        $ceiling = max($ordered->count(), (int) $ordered->max('position'));
+
+        $moving->each(function (Bookshelf $bookshelf, int $index) use ($ceiling) {
+            $bookshelf->position = $ceiling + $index + 1;
+            $bookshelf->save();
+        });
+
+        $moving->each(function (Bookshelf $bookshelf, int $index) {
             $bookshelf->position = $index + 1;
             $bookshelf->save();
         });
-    }
-
-    /**
-     * A duplicate name that slipped past the validation (concurrent requests)
-     * is reported as a validation error.
-     *
-     * @template T
-     *
-     * @param  Closure(): T  $change
-     * @return T
-     */
-    private function guardingUniqueName(Closure $change): mixed
-    {
-        try {
-            return $change();
-        } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages([
-                'name' => 'Vous avez déjà une étagère portant ce nom.',
-            ]);
-        }
     }
 }
