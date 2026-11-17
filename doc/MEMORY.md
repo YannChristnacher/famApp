@@ -1,5 +1,5 @@
 # Mémoire partagée famApp
-> À lire avant d'explorer le code. Mise à jour par l'agent scribe à chaque feature. Dernière mise à jour : F07.
+> À lire avant d'explorer le code. Mise à jour par l'agent scribe à chaque feature. Dernière mise à jour : F08.
 
 ## État du projet
 
@@ -11,7 +11,8 @@
 - F05 bibliothèque : CRUD et ordre des étagères : terminée.
 - F06 bibliothèque : CRUD des livres en saisie manuelle, couverture uploadée, étagères multiples (PR #7) : relue et validée, CI verte ; le statut final dans le backlog passe à `terminée` au merge.
 - F07 bibliothèque : préremplissage par ISBN via Google Books, données brutes, couverture téléchargée, journal des appels (PR #8) : relue et validée, CI verte ; le statut final dans le backlog passe à `terminée` au merge.
-- Prochaine : F08 (scan EAN-13). F09 (étagères du Garage) peut aussi démarrer (dépend de F02).
+- F08 bibliothèque : scan du code-barres EAN-13 à la caméra dans `BookForm`, 100 % front, aucun changement serveur (PR #9) : relue et validée ; le statut final dans le backlog passe à `terminée` au merge.
+- Prochaine : F09 (étagères du Garage, dépend de F02) ; F10 en dépend.
 - Suite du backlog : `doc/BACKLOG.md` (source de vérité des statuts).
 
 ## Carte du code par module
@@ -90,6 +91,14 @@
 - `app/Http/Controllers/Library/GoogleBooksLookupController.php` (invocable, `GET /library/google-books`, route `library.google-books.lookup`, `throttle:google-books`), `LookupGoogleBooksRequest` (ISBN normalisé + règle `Isbn`), `GoogleBooksLookupResource` (exactement `volume_id`, `title`, `author`, `cover_url`). Réponses : 404 aucun livre, 503 quota ou panne, 422 ISBN, 429 limiteur.
 - Front : `composables/useGoogleBooksLookup.ts` (`fetch` same-origin, messages français selon le statut), `components/Library/BookForm.vue` (bouton « Rechercher », encart « Trouvé sur Google Books » fermable, encart de conflit « Remplacer » / « Garder ma saisie », aperçu avec « Ne pas utiliser cette couverture »), type `GoogleBooksLookup` dans `types/library.ts`.
 - Tests : `tests/Feature/Library/{GoogleBooksService,GoogleBooksCoverService,GoogleBooksLookup,SaveBookFromGoogleBooks}Test.php`, `useGoogleBooksLookup.test.ts`, `BookForm.googleBooks.test.ts` ; helpers `googleVolume()`, `googleSearch()`, `jpegBytes()` dans `tests/Pest.php`.
+
+#### Library : scan du code-barres (F08, front seulement)
+- `resources/js/support/library/bookBarcode.ts` : `bookIsbnFromBarcode(raw)` renvoie l'ISBN si EAN-13 de livre (13 chiffres, préfixe 978/979, clé EAN-13 juste, espaces retirés), sinon `null`.
+- `resources/js/support/library/barcodeDetector.ts` : `createBookBarcodeDetector()` (`BarcodeDetector` natif s'il gère `ean_13`, sinon polyfill `barcode-detector/ponyfill` + `zxing_reader.wasm` importés à la demande, `locateFile` vers notre build), `isDetectorUnavailable()` (`NotSupportedError`), types `BookBarcodeDetector`, `DetectedBarcode`.
+- `resources/js/components/Library/IsbnScannerModal.vue` : `UModal` (`v-model:open`, événement `detected(isbn)`) ; `getUserMedia` caméra arrière, `<video muted playsinline>`, lecture toutes les 200 ms, vibration, arrêt des pistes (lecture, fermeture, démontage), messages français par `DOMException.name`, repli « Prendre une photo du code-barres » (`UFileUpload`, décodage dans le navigateur).
+- `BookForm.vue` : bouton « Scanner » (`data-testid="isbn-scan"`) entre l'ISBN et « Rechercher » ; `applyScannedIsbn()` remplit l'ISBN, toast « Code-barres lu », puis `searchGoogleBooks()` (une seule recherche, même limiteur).
+- Build : `vite.config.ts` (plugin `famapp:zxing-without-cdn-fallback`, retire l'URL jsDelivr de zxing-wasm ; le build échoue si le motif disparaît) ; `scripts/check-build-no-cdn.mjs`, lancé par `npm run build` après `vite build` : aucune URL de CDN de code dans `public/build`, `zxing_reader-*.wasm` présent et de SHA-256 égal à `ZXING_WASM_SHA256` de `barcode-detector`.
+- Tests : Vitest `support/library/{bookBarcode,barcodeDetector}.test.ts`, `components/Library/{IsbnScannerModal,BookForm.scanner}.test.ts` (module détecteur mocké par `vi.mock('@/support/library/barcodeDetector')`, `navigator.mediaDevices` défini par `Object.defineProperty`, `fetch` simulé). Pas de Playwright (pas de caméra en CI).
 
 ### Garage
 - Rien encore (F09, F10).
@@ -209,6 +218,8 @@
 - Volume non confirmable à l'enregistrement (Google en panne, budget épuisé) : enregistrement refusé avec erreur sur `google_volume_id` ; fermer l'encart Google permet d'enregistrer à la main (F07).
 - Sans `google_volume_id`, les données brutes existantes sont conservées ; un nouveau volume les remplace (F07).
 - Données Google et URL de couverture distantes jamais exposées au front ni stockées : seule la réponse du endpoint `{volume_id, title, author, cover_url}` sort (F07).
+- Scan EAN-13 : dépendance `barcode-detector` (API standard `BarcodeDetector`, natif préféré) ; le `.wasm` zxing est servi par notre build (`zxing-wasm/reader/zxing_reader.wasm?url`, chargé à la demande), **aucun CDN** : override `locateFile`, plugin Vite et `scripts/check-build-no-cdn.mjs` en défense ; une mise à jour de la bibliothèque qui change l'URL de repli ou le `.wasm` fait échouer le build, à traiter plutôt que contourner (F08).
+- Scan : seul un EAN-13 de livre (978/979, clé juste) est accepté, un autre code est ignoré avec un message discret ; l'image d'une photo est décodée dans le navigateur, jamais envoyée au serveur ; un scan valide remplit l'ISBN et lance seul la recherche Google Books (F08).
 - `route()` du front vient de `ziggy-js` (`skip-route-function`), en URL relative (`false`) (F01).
 - `Fortify` : fonctionnalité `resetPasswords()` uniquement ; routes d'auth écrites dans `routes/web.php` ; `laravel/passkeys` est présent mais inactif (F02).
 - Pas de Playwright hors parcours clés ; `tests/e2e/login.spec.ts` (F02) et `tests/e2e/book.spec.ts` (étagère puis livre, F06) ; job CI `e2e`.
@@ -250,6 +261,14 @@
 - `ConnectionException` (délai, DNS, refus) est journalisée `timeout`, un 404 `not_found` ; ne pas les confondre avec `invalid_response`.
 - Tests : tout fichier Google Books pose `Http::preventStrayRequests()` ; un test de formulaire qui compare la charge utile exacte doit inclure `google_volume_id` et `use_google_cover` (deux tests de F06 complétés).
 
+### Scanner de code-barres (relevés en relecture F08)
+- Le polyfill `barcode-detector` avale l'échec de chargement du `.wasm` dans son constructeur : attendre `prepareZXingModule({ fireImmediately: true })` avant de le créer (`purgeZXingModule()` en cas d'échec pour permettre un nouvel essai), et traiter un rejet `NotSupportedError` de `detect()` comme « lecteur indisponible » (arrêter la caméra), jamais comme « aucun code ».
+- Le plugin Vite qui retire l'URL jsDelivr de repli de zxing-wasm n'agit qu'au build ; en `npm run dev`, l'URL reste dans le code préempaqueté mais l'override `locateFile` sert le `.wasm` localement.
+- `zxing-wasm` n'est pas déclaré dans `package.json` (dépendance transitive de `barcode-detector`, une seule copie avec npm) : ne pas en ajouter une autre version, `scripts/check-build-no-cdn.mjs` compare le `.wasm` émis à celui que la bibliothèque attend.
+- Worktree avec `node_modules` en lien symbolique : Vite refuse l'import `zxing-wasm/reader/zxing_reader.wasm?url` et 3 tests de `barcodeDetector.test.ts` échouent ; utiliser un `node_modules` propre au worktree.
+- Un `File` venant de `UFileUpload` (ou rangé dans un `ref`) est un proxy réactif refusé par les API natives : `shallowRef` + `toRaw()` avant `detect()`.
+- Décodages asynchrones (caméra et photo) liés à un jeton de session incrémenté à chaque ouverture/fermeture : une réponse tardive ne doit rien émettre.
+
 ### Ziggy, Inertia, tests
 - Test Pest d'une page : Ziggy imprime sa liste une fois par processus PHP ; `tests/TestCase.php` la réinitialise (`BladeRouteGenerator::$generated`, `Ziggy::clearRoutes()`), ne pas retirer.
 - Requête Inertia dans un test sans `X-Inertia-Version` : le contrôle de version renvoie un 409 ; utiliser `inertiaHeaders()`.
@@ -275,7 +294,6 @@
 
 ## Notes pour les features à venir
 
-- F08 : le scan EAN-13 alimente le champ ISBN de `BookForm.vue` ; le bouton « Rechercher » (`useGoogleBooksLookup`) exige un ISBN non vide et valide côté serveur, limité à 10 recherches/min par membre : un scan qui déclenche la recherche seul doit s'y plier.
 - F11 : `BookPolicy` n'autorise que le propriétaire (404 sinon) ; la lecture seule des autres membres demande une Policy de consultation distincte, sans toucher à `update`/`delete`. `BookResource` expose déjà `cover_url`.
 - F12 : source de recherche livres : `books` (titre, auteur, ISBN) ; index `user_id`+`title` seulement.
 - F10 : la Policy du modèle appartenant à un membre suit `BookshelfPolicy` (404 pour un autre membre) ; la lecture seule des autres membres arrive en F11, avec ses propres Policies de consultation.
@@ -283,6 +301,6 @@
 - F12 : chaque module fournit sa source de recherche globale ; `UDashboardSearch` a `:groups="[]"` et un texte « arrive bientôt » dans `DashboardLayout.vue` à remplacer.
 - F13 : la page de contrôle admin ira dans le groupe `admin` de Ziggy (`$adminRoutes`).
 - F13 : le journal `google_books_requests` (F07, modèle `App\Models\Library\GoogleBooksRequest`, statuts `GoogleBooksRequestStatus`) grossit sans fin : le purger (`Prunable` + durée de conservation configurable, `model:prune` planifié) ; un index `(status, created_at)` sera probablement utile pour les filtres de la page de contrôle (seul `created_at` est indexé aujourd'hui).
-- F14 : configurer `trustProxies` (sinon tous les visiteurs partagent la même IP dans les limiteurs) ; les liens d'invitation signés exigent la bonne config proxy/HTTPS ; masquer `signature` dans les logs Nginx.
+- F14 : la caméra du scanner (F08) exige HTTPS (sauf `localhost`) ; nginx doit servir `.wasm` en `application/wasm` (sinon repli sans streaming, plus lent) ; configurer `trustProxies` (sinon tous les visiteurs partagent la même IP dans les limiteurs) ; les liens d'invitation signés exigent la bonne config proxy/HTTPS ; masquer `signature` dans les logs Nginx.
 - Les comptes ne peuvent pas être supprimés aujourd'hui ; les étagères se suppriment en cascade avec le compte.
 - Si un jour un compte peut être supprimé, supprimer aussi ses couvertures (`books.cover_path` ; la cascade SQL ne nettoie pas le disque).

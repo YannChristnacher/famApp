@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useForm } from '@inertiajs/vue3'
+import { useToast } from '@nuxt/ui/composables'
 import { route } from 'ziggy-js'
 import BookCover from '@/components/Library/BookCover.vue'
+import IsbnScannerModal from '@/components/Library/IsbnScannerModal.vue'
 import { useGoogleBooksLookup } from '@/composables/useGoogleBooksLookup'
 import type { Book, Bookshelf, GoogleBooksLookup } from '@/types/library'
 
@@ -79,6 +81,17 @@ async function searchGoogleBooks(): Promise<void> {
 
   form.title = form.title.trim() === '' ? found.title : form.title
   form.author = form.author.trim() === '' ? found.author : form.author
+}
+
+const scannerOpen = ref(false)
+const toast = useToast()
+
+/** A scanned barcode fills the ISBN and searches it (one search, same limiter). */
+async function applyScannedIsbn(isbn: string): Promise<void> {
+  form.isbn = isbn
+  form.clearErrors('isbn')
+  toast.add({ title: 'Code-barres lu', description: `ISBN ${isbn}`, color: 'success', icon: 'i-lucide-scan-barcode' })
+  await searchGoogleBooks()
 }
 
 function replaceTypedFields(): void {
@@ -176,6 +189,16 @@ function submit(): void {
             class="w-full"
           />
           <UButton
+            icon="i-lucide-scan-barcode"
+            color="neutral"
+            variant="outline"
+            aria-label="Scanner le code-barres avec la caméra"
+            data-testid="isbn-scan"
+            @click="scannerOpen = true"
+          >
+            Scanner
+          </UButton>
+          <UButton
             icon="i-lucide-search"
             color="neutral"
             variant="outline"
@@ -189,6 +212,11 @@ function submit(): void {
           </UButton>
         </div>
       </UFormField>
+
+      <IsbnScannerModal
+        v-model:open="scannerOpen"
+        @detected="applyScannedIsbn"
+      />
 
       <UAlert
         v-if="proposal"
