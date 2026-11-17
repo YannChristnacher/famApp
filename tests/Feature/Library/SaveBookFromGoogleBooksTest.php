@@ -1,8 +1,10 @@
 <?php
 
+use App\Enums\Library\GoogleBooksRequestStatus;
 use App\Enums\Library\GoogleBooksRequestType;
 use App\Models\Library\Book;
 use App\Models\Library\GoogleBooksRequest;
+use App\Services\Library\BookCoverService;
 use App\Services\Library\GoogleBooksService;
 use Illuminate\Http\Client\Request;
 use Illuminate\Http\UploadedFile;
@@ -128,6 +130,37 @@ it('refuses to save when the volume cannot be fetched by the server', function (
     'unavailable' => [fn () => Http::response('', 503)],
     'timeout' => [fn () => Http::failedConnection()],
 ]);
+
+it('saves the book without the cover when the Google cover cannot be written', function () {
+    fakeGoogleVolumeAndCover();
+    app()->instance(BookCoverService::class, Mockery::mock(BookCoverService::class)
+        ->shouldReceive('store')->andThrow(new RuntimeException('No space left on device'))->getMock());
+    signIn();
+
+    post(route('library.books.store'), googleBookForm())
+        ->assertSessionHasNoErrors()
+        ->assertInertiaFlash('toast', [
+            'type' => 'success',
+            'message' => 'Le livre « Le Hobbit » a été ajouté, mais la couverture Google Books n’a pas pu être récupérée.',
+        ]);
+
+    expect(Book::query()->sole()->cover_path)->toBeNull()
+        ->and(GoogleBooksRequest::query()->where('type', GoogleBooksRequestType::Cover)->sole()->status)->toBe(GoogleBooksRequestStatus::StorageFailed);
+});
+
+it('refuses to save when the member made too many Google calls while saving', function () {
+    config(['services.google_books.save_calls_per_minute' => 2]);
+    Http::fake(fn (Request $request) => Http::response(googleVolume(basename((string) parse_url($request->url(), PHP_URL_PATH)))));
+    signIn();
+
+    post(route('library.books.store'), googleBookForm(['google_volume_id' => 'volumeA', 'use_google_cover' => false]))->assertSessionHasNoErrors();
+    post(route('library.books.store'), googleBookForm(['google_volume_id' => 'volumeB', 'use_google_cover' => false]))->assertSessionHasNoErrors();
+    post(route('library.books.store'), googleBookForm(['google_volume_id' => 'volumeC', 'use_google_cover' => false]))
+        ->assertSessionHasErrors(['google_volume_id' => 'Trop d’appels à Google Books. Patientez une minute avant d’enregistrer, ou fermez l’encart Google Books pour enregistrer votre saisie seule.']);
+
+    expect(Book::query()->count())->toBe(2);
+    Http::assertSentCount(2);
+});
 
 it('rejects a malformed volume identifier without calling Google', function (string $volumeId) {
     Http::fake();

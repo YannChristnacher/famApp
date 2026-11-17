@@ -61,3 +61,14 @@ Notes d'implémentation :
 - `BookService::create|update` reçoivent un `BookCoverInput` (fichier, retrait, couverture Google) et renvoient un `SavedBook` (`googleCoverMissing` pour le toast). Deux tests Vitest de F06 qui comparaient la charge utile exacte ont été complétés avec `google_volume_id` et `use_google_cover` (aucun retiré).
 - MySQL réordonne les clés d'un objet JSON stocké : les tests comparent `google_books_data` avec `toEqual` (pas `toBe`), sinon ils passent sous SQLite et échouent en CI.
 - Playwright inchangé : le parcours « ajout livre » en saisie manuelle reste valide ; tester la recherche demanderait un vrai appel à Google ou un faux serveur.
+
+## Relecture (2026-11-17)
+Relecteur indépendant : aucun point bloquant. Points mineurs corrigés sur la même branche :
+
+1. **Bombe gzip** : la couverture est téléchargée avec `Accept-Encoding: identity` et l'option Guzzle `decode_content => false` : le plafond de 2 Mo porte sur les octets réellement reçus. Testé (options et en-tête de la requête ; un corps gzip n'est pas décompressé et est refusé comme non-image).
+2. **Appels Google à l'enregistrement** : nouveau limiteur `GoogleBooksSaveLimiter` (par membre, `services.google_books.save_calls_per_minute`, 20 par défaut), consommé par chaque appel fait pendant un enregistrement : confirmation d'un volume absent du cache et téléchargement d'une couverture. Choix : volume au-delà du budget → enregistrement **refusé** avec l'erreur française « Trop d'appels à Google Books… » sur `google_volume_id` (fermer l'encart permet d'enregistrer la saisie seule) ; couverture au-delà du budget → livre enregistré sans couverture (toast habituel), journalisé `rate_limited`. Un volume en cache ne consomme rien. Testé (service, couverture et enregistrement).
+3. **Client API** : `withoutRedirecting()` ; une redirection est traitée comme une réponse inattendue (`invalid_response`), la clé n'est jamais renvoyée ailleurs. Testé (option `allow_redirects` à `false`, une seule requête).
+4. **Échec d'écriture de la couverture** (disque plein…) : toute exception autre que `ValidationException` dans `storeImage` devient le statut `storage_failed` (nouveau cas de `GoogleBooksRequestStatus`), journalisée avec le code HTTP ; le livre est enregistré sans couverture et le toast le signale. Testé.
+5. **`largestCover`** : une taille sur un hôte non autorisé est ignorée au profit de la taille suivante, au lieu de renvoyer `null`. Testé.
+
+Note ajoutée dans `doc/MEMORY.md` (F13) : purge du journal (`Prunable`, durée configurable) et index `(status, created_at)` probable.

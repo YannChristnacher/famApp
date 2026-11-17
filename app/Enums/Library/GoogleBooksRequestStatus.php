@@ -15,6 +15,9 @@ enum GoogleBooksRequestStatus: string
     case Timeout = 'timeout';
     case InvalidResponse = 'invalid_response';
 
+    /** The downloaded cover could not be written (disk full, unreadable image…). */
+    case StorageFailed = 'storage_failed';
+
     /** Cover URL or redirect refused before any request (not https, host not allowed, too big). */
     case Refused = 'refused';
 

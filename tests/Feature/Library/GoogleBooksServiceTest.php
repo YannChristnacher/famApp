@@ -120,6 +120,10 @@ it('picks the largest cover and never keeps a cover of an unknown host', functio
         'https://books.googleusercontent.com/l.jpg',
     ],
     'unknown host' => [['thumbnail' => 'http://evil.example.com/books.google.com.jpg'], null],
+    'largest on an unknown host' => [
+        ['extraLarge' => 'https://evil.example.com/xl.jpg', 'large' => 'file:///etc/passwd', 'thumbnail' => 'http://books.google.com/t.jpg'],
+        'https://books.google.com/t.jpg',
+    ],
     'look-alike host' => [['thumbnail' => 'https://books.google.com.evil.example/c.jpg'], null],
     'other scheme' => [['thumbnail' => 'file:///etc/passwd'], null],
     'credentials' => [['thumbnail' => 'https://user@books.google.com/c.jpg'], null],
@@ -171,6 +175,40 @@ it('reports a refused, failing or unexpected answer of Google', function (mixed 
     'volume without title' => [fn () => Http::response(googleSearch([googleVolume(volumeInfo: ['title' => ''])])), GoogleBooksRequestStatus::InvalidResponse, 200],
     'volumeInfo not an object' => [fn () => Http::response(googleSearch([['id' => 'abc', 'volumeInfo' => 'x']])), GoogleBooksRequestStatus::InvalidResponse, 200],
 ]);
+
+it('never follows a redirect of the API, which would resend the key', function () {
+    config(['services.google_books.key' => 'secret-key']);
+    $options = [];
+    Http::fake(function (Request $request, array $requestOptions) use (&$options) {
+        $options = $requestOptions;
+
+        return Http::response('', 302, ['Location' => 'https://evil.example.com/steal']);
+    });
+
+    expect(failedLookupStatus())->toBe(GoogleBooksRequestStatus::InvalidResponse)
+        ->and($options['allow_redirects'] ?? null)->toBeFalse();
+    Http::assertSentCount(1);
+    expect(GoogleBooksRequest::query()->sole()->http_status)->toBe(302);
+});
+
+it('limits the calls made to confirm volumes while saving books', function () {
+    config(['services.google_books.save_calls_per_minute' => 2]);
+    Http::fake(fn (Request $request) => Http::response(googleVolume(basename((string) parse_url($request->url(), PHP_URL_PATH)))));
+    $user = User::factory()->create();
+    $service = app(GoogleBooksService::class);
+
+    $service->trustedVolume('volumeA', $user);
+    $service->trustedVolume('volumeB', $user);
+
+    expect(fn () => $service->trustedVolume('volumeC', $user))
+        ->toThrow(ValidationException::class, 'Trop d’appels à Google Books. Patientez une minute avant d’enregistrer, ou fermez l’encart Google Books pour enregistrer votre saisie seule.');
+    Http::assertSentCount(2);
+
+    // A cached volume needs no call, so it is not limited.
+    expect($service->trustedVolume('volumeA', $user)->id)->toBe('volumeA');
+    // Another member has their own budget.
+    expect($service->trustedVolume('volumeC', User::factory()->create())->id)->toBe('volumeC');
+});
 
 it('gives a French message for each failure', function () {
     expect((new GoogleBooksUnavailableException(GoogleBooksRequestStatus::RateLimited))->getMessage())

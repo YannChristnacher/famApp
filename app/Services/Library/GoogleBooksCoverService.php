@@ -14,6 +14,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Throwable;
 
 /**
  * Downloads the cover of a trusted Google Books volume and stores it through
@@ -32,6 +33,7 @@ class GoogleBooksCoverService
         private readonly GoogleBooksCoverPolicy $policy,
         private readonly BookCoverService $covers,
         private readonly GoogleBooksJournal $journal,
+        private readonly GoogleBooksSaveLimiter $limiter,
     ) {}
 
     /**
@@ -48,8 +50,11 @@ class GoogleBooksCoverService
         $query = $this->journalQuery($volume->coverUrl);
 
         try {
+            if (! $this->limiter->attempt($user)) {
+                throw new GoogleBooksUnavailableException(GoogleBooksRequestStatus::RateLimited);
+            }
             $image = $this->download($volume->coverUrl);
-            $path = $this->storeImage($image->body());
+            $path = $this->storeImage($image);
         } catch (GoogleBooksUnavailableException $exception) {
             $this->journal->record(GoogleBooksRequestType::Cover, $query, $exception->status, $exception->httpStatus, $startedAt, $user);
 
@@ -100,10 +105,14 @@ class GoogleBooksCoverService
         $timeout = (int) config('services.google_books.cover_timeout');
 
         try {
+            // Raw bytes only (identity, no decoding): the size limit must bound
+            // what is really stored, not a compressed body inflated afterwards.
             return Http::withoutRedirecting()
+                ->withHeaders(['Accept-Encoding' => 'identity'])
                 ->timeout($timeout)
                 ->connectTimeout(min(3, $timeout))
                 ->withOptions([
+                    'decode_content' => false,
                     // Stops a body larger than announced (or not announced) while it downloads.
                     'progress' => function (int $total, int $downloaded) use ($maxBytes, &$tooBig): void {
                         if ($total > $maxBytes || $downloaded > $maxBytes) {
@@ -149,17 +158,20 @@ class GoogleBooksCoverService
     /**
      * @throws GoogleBooksUnavailableException
      */
-    private function storeImage(string $bytes): string
+    private function storeImage(Response $image): string
     {
         $temporary = tempnam(sys_get_temp_dir(), 'google-cover-');
-        if ($temporary === false || file_put_contents($temporary, $bytes) === false) {
-            throw new GoogleBooksUnavailableException(GoogleBooksRequestStatus::InvalidResponse);
+        if ($temporary === false || file_put_contents($temporary, $image->body()) === false) {
+            throw new GoogleBooksUnavailableException(GoogleBooksRequestStatus::StorageFailed, $image->status());
         }
 
         try {
             return $this->covers->store(new UploadedFile($temporary, 'cover', null, null, true));
         } catch (ValidationException) {
-            throw new GoogleBooksUnavailableException(GoogleBooksRequestStatus::InvalidResponse, 200);
+            throw new GoogleBooksUnavailableException(GoogleBooksRequestStatus::InvalidResponse, $image->status());
+        } catch (Throwable) {
+            // Disk full, unwritable storage…: the book is saved without this cover.
+            throw new GoogleBooksUnavailableException(GoogleBooksRequestStatus::StorageFailed, $image->status());
         } finally {
             @unlink($temporary);
         }

@@ -4,6 +4,7 @@ use App\Enums\Library\GoogleBooksRequestStatus;
 use App\Enums\Library\GoogleBooksRequestType;
 use App\Models\Library\GoogleBooksRequest;
 use App\Models\User;
+use App\Services\Library\BookCoverService;
 use App\Services\Library\GoogleBooksCoverService;
 use App\Services\Library\GoogleBooksVolume;
 use Illuminate\Http\Client\Request;
@@ -49,6 +50,55 @@ it('downloads the cover and stores it resized, under a random name', function ()
         ->and($log->status)->toBe(GoogleBooksRequestStatus::Found)
         ->and($log->http_status)->toBe(200)
         ->and($log->user_id)->toBe($user->id);
+});
+
+it('downloads the raw bytes, never a decompressed body', function () {
+    $sent = [];
+    Http::fake(function (Request $request, array $options) use (&$sent) {
+        $sent = ['options' => $options, 'encoding' => $request->header('Accept-Encoding')];
+
+        return Http::response(jpegBytes(300, 450), 200, ['Content-Type' => 'image/jpeg']);
+    });
+
+    expect(storeGoogleCover(GOOGLE_COVER_URL))->not->toBeNull()
+        ->and($sent['options']['decode_content'] ?? null)->toBeFalse()
+        ->and($sent['encoding'])->toBe(['identity']);
+});
+
+it('refuses a compressed body instead of inflating it', function () {
+    // 10 Mo of zeros gzipped into a few kilobytes: kept compressed, it is not an image.
+    $bomb = (string) gzencode(str_repeat("\0", 10 * 1024 * 1024), 9);
+    Http::fake(['books.google.com/*' => Http::response($bomb, 200, ['Content-Type' => 'image/jpeg', 'Content-Encoding' => 'gzip'])]);
+
+    expect(storeGoogleCover(GOOGLE_COVER_URL))->toBeNull()
+        ->and(Storage::disk('public')->allFiles())->toBe([])
+        ->and(GoogleBooksRequest::query()->sole()->status)->toBe(GoogleBooksRequestStatus::InvalidResponse);
+});
+
+it('journals a cover that cannot be written and gives up', function () {
+    Http::fake(['books.google.com/*' => Http::response(jpegBytes(300, 450), 200, ['Content-Type' => 'image/jpeg'])]);
+    app()->instance(BookCoverService::class, Mockery::mock(BookCoverService::class)
+        ->shouldReceive('store')->andThrow(new RuntimeException('No space left on device'))->getMock());
+
+    expect(storeGoogleCover(GOOGLE_COVER_URL))->toBeNull();
+
+    $log = GoogleBooksRequest::query()->sole();
+    expect($log->status)->toBe(GoogleBooksRequestStatus::StorageFailed)
+        ->and($log->http_status)->toBe(200);
+});
+
+it('limits the cover downloads of each member', function () {
+    config(['services.google_books.save_calls_per_minute' => 1]);
+    Http::fake(['books.google.com/*' => Http::response(jpegBytes(300, 450), 200, ['Content-Type' => 'image/jpeg'])]);
+    $user = User::factory()->create();
+
+    expect(storeGoogleCover(GOOGLE_COVER_URL, $user))->not->toBeNull()
+        ->and(storeGoogleCover(GOOGLE_COVER_URL, $user))->toBeNull()
+        ->and(storeGoogleCover(GOOGLE_COVER_URL))->not->toBeNull();
+
+    Http::assertSentCount(2);
+    expect(GoogleBooksRequest::query()->where('user_id', $user->id)->pluck('status')->all())
+        ->toBe([GoogleBooksRequestStatus::Found, GoogleBooksRequestStatus::RateLimited]);
 });
 
 it('stores nothing for a volume without cover, without any call', function () {

@@ -11,7 +11,8 @@ class GoogleBooksCoverPolicy
     private const IMAGE_SIZES = ['extraLarge', 'large', 'medium', 'small', 'thumbnail', 'smallThumbnail'];
 
     /**
-     * The largest cover listed in the imageLinks of a trusted Google answer.
+     * The largest allowed cover listed in the imageLinks of a trusted Google
+     * answer (a size on another host is skipped for the next one).
      * Google lists its images in http: the scheme is raised to https, and
      * only for an allowed host.
      */
@@ -23,8 +24,9 @@ class GoogleBooksCoverPolicy
 
         foreach (self::IMAGE_SIZES as $size) {
             $url = $imageLinks[$size] ?? null;
-            if (is_string($url)) {
-                return $this->upgradedUrl($url);
+            $trusted = is_string($url) ? $this->upgradedUrl($url) : null;
+            if ($trusted !== null) {
+                return $trusted;
             }
         }
 

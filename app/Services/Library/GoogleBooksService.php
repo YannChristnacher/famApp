@@ -25,6 +25,8 @@ class GoogleBooksService
 
     public const UNTRUSTED_VOLUME = 'Les informations Google Books n’ont pas pu être vérifiées. Réessayez, ou fermez l’encart Google Books pour enregistrer votre saisie seule.';
 
+    public const TOO_MANY_CALLS = 'Trop d’appels à Google Books. Patientez une minute avant d’enregistrer, ou fermez l’encart Google Books pour enregistrer votre saisie seule.';
+
     private const TEXT_MAX_LENGTH = 255;
 
     private const CACHE_PREFIX = 'google-books:volume:';
@@ -32,6 +34,7 @@ class GoogleBooksService
     public function __construct(
         private readonly GoogleBooksJournal $journal,
         private readonly GoogleBooksCoverPolicy $covers,
+        private readonly GoogleBooksSaveLimiter $limiter,
     ) {}
 
     /**
@@ -60,7 +63,7 @@ class GoogleBooksService
      * The volume as Google knows it, from the server cache or from a new
      * call; never from data sent by the browser.
      *
-     * @throws ValidationException When Google cannot confirm the volume.
+     * @throws ValidationException When Google cannot confirm the volume, or the member made too many calls.
      */
     public function trustedVolume(string $volumeId, User $user): GoogleBooksVolume
     {
@@ -71,6 +74,10 @@ class GoogleBooksService
         $cached = Cache::get(self::CACHE_PREFIX.$volumeId);
         if (is_array($cached)) {
             return $this->volumeFrom($cached);
+        }
+
+        if (! $this->limiter->attempt($user)) {
+            throw ValidationException::withMessages(['google_volume_id' => self::TOO_MANY_CALLS]);
         }
 
         try {
@@ -117,6 +124,9 @@ class GoogleBooksService
             if ($response->failed()) {
                 throw new GoogleBooksUnavailableException(GoogleBooksRequestStatus::fromFailedHttpStatus($response->status()), $response->status());
             }
+            if ($response->redirect()) {
+                throw $this->invalidResponse();
+            }
             $result = $read($response);
         } catch (GoogleBooksUnavailableException $exception) {
             $this->journal->record($type, $query, $exception->status, $response->status(), $startedAt, $user);
@@ -134,7 +144,9 @@ class GoogleBooksService
     {
         $timeout = (int) config('services.google_books.timeout');
 
+        // A redirect is never followed: it would send the API key to another URL.
         return Http::baseUrl((string) config('services.google_books.base_url'))
+            ->withoutRedirecting()
             ->timeout($timeout)
             ->connectTimeout(min(3, $timeout))
             ->acceptJson();
