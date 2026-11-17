@@ -12,6 +12,13 @@ $libraryRoutes = [
     'library.bookshelves.update',
     'library.bookshelves.destroy',
     'library.bookshelves.move',
+    'library.books.index',
+    'library.books.create',
+    'library.books.store',
+    'library.books.show',
+    'library.books.edit',
+    'library.books.update',
+    'library.books.destroy',
 ];
 
 it('exposes the library routes to signed-in users', function (bool $admin) use ($libraryRoutes) {

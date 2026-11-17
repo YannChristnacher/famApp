@@ -70,7 +70,7 @@ it('lets a signed-in user reach every library route on their own bookshelf', fun
         $response->assertRedirect(route($redirect))->assertSessionHasNoErrors();
     }
 })->with([
-    'library.index' => ['library.index', 302, 'library.bookshelves.index'],
+    'library.index' => ['library.index', 302, 'library.books.index'],
     'index' => ['index', 200, null],
     'store' => ['store', 302, 'library.bookshelves.index'],
     'update' => ['update', 302, 'library.bookshelves.index'],
