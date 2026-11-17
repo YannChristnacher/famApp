@@ -33,8 +33,8 @@ it('renders an empty library', function () {
         ->assertInertia(fn (Assert $page) => $page->component('Library/Bookshelves/Index')->has('bookshelves', 0));
 });
 
-it('opens the library on the bookshelves page', function () {
+it('opens the library on the books page (F06)', function () {
     actingAs(User::factory()->admin()->create());
 
-    get(route('library.index'))->assertRedirect(route('library.bookshelves.index'));
+    get(route('library.index'))->assertRedirect(route('library.books.index'));
 });

@@ -6,13 +6,13 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 
 /**
- * Entry point of the Library module (sidebar): opens the bookshelves for now;
- * the books (F06) will live next to them under /library.
+ * Entry point of the Library module (sidebar): opens the books of the member;
+ * their bookshelves are one click away.
  */
 class LibraryController extends Controller
 {
     public function __invoke(): RedirectResponse
     {
-        return to_route('library.bookshelves.index');
+        return to_route('library.books.index');
     }
 }

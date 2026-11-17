@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Role;
+use App\Models\Library\Book;
 use App\Models\Library\Bookshelf;
 use App\Notifications\Auth\ResetPasswordNotification;
 use Database\Factories\UserFactory;
@@ -64,6 +65,14 @@ class User extends Authenticatable
     public function bookshelves(): HasMany
     {
         return $this->hasMany(Bookshelf::class)->orderBy('position')->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<Book, $this>
+     */
+    public function books(): HasMany
+    {
+        return $this->hasMany(Book::class);
     }
 
     public function isAdmin(): bool

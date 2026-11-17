@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\AccountRequestController;
 use App\Http\Controllers\Auth\AuthPageController;
 use App\Http\Controllers\Auth\InvitationController;
 use App\Http\Controllers\Core\HomeController;
+use App\Http\Controllers\Library\BookController;
 use App\Http\Controllers\Library\BookshelfController;
 use App\Http\Controllers\Library\BookshelfPositionController;
 use App\Http\Controllers\Library\LibraryController;
@@ -60,6 +61,8 @@ Route::middleware('auth')->group(function () {
         Route::resource('bookshelves', BookshelfController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::patch('/bookshelves/{bookshelf}/move', [BookshelfPositionController::class, 'update'])
             ->name('bookshelves.move');
+
+        Route::resource('books', BookController::class);
     });
 });
 

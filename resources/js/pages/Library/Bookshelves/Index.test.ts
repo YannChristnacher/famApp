@@ -191,4 +191,15 @@ describe('Library/Bookshelves/Index', () => {
     await rowButton(wrapper, 0, 'Descendre').trigger('click')
     expect(patch).toHaveBeenLastCalledWith('/library/bookshelves/4/move', { direction: 'down' }, expect.any(Object))
   })
+
+  it('links each bookshelf to its books, and the page to all the books (F06)', async () => {
+    const wrapper = await mountPage()
+
+    expect(rows(wrapper).map((row) => row.find('a[aria-label^="Voir les livres"]').attributes('href'))).toEqual([
+      '/library/books?bookshelf=4',
+      '/library/books?bookshelf=9',
+      '/library/books?bookshelf=2',
+    ])
+    expect(wrapper.find('a[href="/library/books"]').text()).toContain('Mes livres')
+  })
 })

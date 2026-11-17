@@ -60,6 +60,17 @@ function move(bookshelf: Bookshelf, direction: BookshelfMoveDirection): void {
     :breadcrumb="breadcrumb"
   >
     <div class="mx-auto w-full max-w-3xl space-y-6">
+      <div class="flex justify-end">
+        <UButton
+          :to="route('library.books.index', undefined, false)"
+          icon="i-lucide-book-open"
+          color="neutral"
+          variant="ghost"
+        >
+          Mes livres
+        </UButton>
+      </div>
+
       <UCard>
         <UForm
           :state="createForm"
@@ -118,6 +129,14 @@ function move(bookshelf: Bookshelf, direction: BookshelfMoveDirection): void {
             <span class="min-w-0 flex-1 truncate font-medium text-highlighted">{{ bookshelf.name }}</span>
 
             <div class="flex shrink-0 gap-1">
+              <UButton
+                :to="route('library.books.index', { bookshelf: bookshelf.id }, false)"
+                icon="i-lucide-book-open"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                :aria-label="`Voir les livres de l'étagère ${bookshelf.name}`"
+              />
               <UButton
                 icon="i-lucide-arrow-up"
                 color="neutral"
