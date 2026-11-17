@@ -37,9 +37,17 @@ Risque : nginx doit servir `.wasm` en `application/wasm` (présent dans `mime.ty
 
 Notes d'implémentation :
 - `zxing-wasm/reader/zxing_reader.wasm?url` est importé depuis la dépendance transitive de `barcode-detector` (même version, une seule copie dans `node_modules` avec npm) : aucune deuxième dépendance déclarée.
-- Le plugin Vite ne s'applique qu'au build : en `npm run dev`, Vite préempaquette la bibliothèque sans lui, mais l'override `locateFile` reste actif.
+- Le plugin Vite ne s'applique qu'au build : en `npm run dev`, Vite préempaquette la bibliothèque sans lui (l'URL jsDelivr de repli reste dans le code servi), mais l'override `locateFile` reste actif et le `.wasm` est bien servi localement.
+- Worktree dont `node_modules` est un lien symbolique vers celui du dépôt principal : Vite refuse l'import `zxing-wasm/reader/zxing_reader.wasm?url` (fichier hors de la racine autorisée) et 3 tests de `barcodeDetector.test.ts` échouent pour cette seule raison. Utiliser un `node_modules` propre au worktree (`npm ci`) pour ces tests.
 - Le `File` choisi par `UFileUpload` arrive enveloppé dans un proxy réactif de Vue, que les décodeurs natifs refusent : `shallowRef` + `toRaw()` avant `detect()` (couvert par un test).
 - Vérification manuelle dans Chrome headless (spécification Playwright temporaire, non versionnée) : caméra simulée (`--use-fake-device-for-media-stream` + vidéo d'un EAN-13 généré) et repli photo (code livre et code non-livre) décodés par le polyfill, `.wasm` chargé depuis `127.0.0.1/build/assets`, aucune requête vers un autre hôte.
+
+## Relecture (2026-11-17)
+Relecteur indépendant : 1 point bloquant, 3 mineurs, tous corrigés.
+- **Bloquant** : le constructeur du polyfill avale l'échec de chargement du `.wasm` (hors ligne, 404 après déploiement) ; chaque `detect()` rejetait ensuite en `NotSupportedError`, que la boucle ignorait (caméra allumée sans fin, sans message) et que le repli photo présentait comme « Aucun code-barres lisible ». Correctif : `prepareZXingModule({ overrides: { locateFile }, fireImmediately: true })` est attendu avant de créer le détecteur (échec → `purgeZXingModule()` pour permettre un nouvel essai, puis `READER_FAILED`) ; un rejet `NotSupportedError` de `detect()` (`isDetectorUnavailable()`) arrête la caméra et affiche `READER_FAILED`, dans la boucle comme pour une photo ; les autres rejets (vidéo pas encore prête : `InvalidStateError`) restent ignorés. Tests : `prepareZXingModule` qui rejette, `detect()` en `NotSupportedError` (caméra et photo), vidéo pas prête, nouvel essai à la réouverture. Vérifié aussi dans Chrome headless avec le `.wasm` en 404 (message, caméra arrêtée), puis réouverture une fois le fichier rendu disponible (lecture réussie).
+- `scripts/check-build-no-cdn.mjs` compare le SHA-256 du `.wasm` émis à `ZXING_WASM_SHA256` exporté par `barcode-detector/ponyfill` (version attendue par la bibliothèque) : le build échoue en cas de décalage avec la dépendance transitive importée.
+- Plugin sans effet en dev et piège du worktree à `node_modules` lié : documentés ci-dessus et dans `doc/MEMORY.md`.
+- Repli photo : jeton de session ; un décodage terminé après fermeture (ou fermeture puis réouverture) n'est pas émis. Testé.
 
 ## Status
 - Branch: feature/F08-scan-isbn

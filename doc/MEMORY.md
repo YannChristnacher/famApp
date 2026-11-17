@@ -250,6 +250,14 @@
 - `ConnectionException` (délai, DNS, refus) est journalisée `timeout`, un 404 `not_found` ; ne pas les confondre avec `invalid_response`.
 - Tests : tout fichier Google Books pose `Http::preventStrayRequests()` ; un test de formulaire qui compare la charge utile exacte doit inclure `google_volume_id` et `use_google_cover` (deux tests de F06 complétés).
 
+### Scanner de code-barres (relevés en relecture F08)
+- Le polyfill `barcode-detector` avale l'échec de chargement du `.wasm` dans son constructeur : attendre `prepareZXingModule({ fireImmediately: true })` avant de le créer (`purgeZXingModule()` en cas d'échec pour permettre un nouvel essai), et traiter un rejet `NotSupportedError` de `detect()` comme « lecteur indisponible » (arrêter la caméra), jamais comme « aucun code ».
+- Le plugin Vite qui retire l'URL jsDelivr de repli de zxing-wasm n'agit qu'au build ; en `npm run dev`, l'URL reste dans le code préempaqueté mais l'override `locateFile` sert le `.wasm` localement.
+- `zxing-wasm` (dépendance transitive) est importé pour l'URL du `.wasm` : `scripts/check-build-no-cdn.mjs` (lancé par `npm run build`) vérifie son SHA-256 contre `ZXING_WASM_SHA256` de `barcode-detector` et l'absence d'URL de CDN dans le build.
+- Worktree avec `node_modules` en lien symbolique : Vite refuse l'import `zxing-wasm/reader/zxing_reader.wasm?url` et 3 tests de `barcodeDetector.test.ts` échouent ; utiliser un `node_modules` propre au worktree.
+- Un `File` venant de `UFileUpload` (ou rangé dans un `ref`) est un proxy réactif refusé par les API natives : `shallowRef` + `toRaw()` avant `detect()`.
+- Décodages asynchrones (caméra et photo) liés à un jeton de session incrémenté à chaque ouverture/fermeture : une réponse tardive ne doit rien émettre.
+
 ### Ziggy, Inertia, tests
 - Test Pest d'une page : Ziggy imprime sa liste une fois par processus PHP ; `tests/TestCase.php` la réinitialise (`BladeRouteGenerator::$generated`, `Ziggy::clearRoutes()`), ne pas retirer.
 - Requête Inertia dans un test sans `X-Inertia-Version` : le contrôle de version renvoie un 409 ; utiliser `inertiaHeaders()`.
