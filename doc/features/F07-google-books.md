@@ -52,11 +52,12 @@ Hypothèses :
 ## Status
 - Branch: feature/F07-google-books
 - Tests written: yes (tests/Feature/Library/{GoogleBooksService,GoogleBooksCoverService,GoogleBooksLookup,SaveBookFromGoogleBooks}Test.php, LibraryRouteListTest complété ; resources/js/composables/useGoogleBooksLookup.test.ts, resources/js/components/Library/BookForm.googleBooks.test.ts)
-- Tests passing: yes en local (composer test, composer lint, npm run test, npm run lint, npm run build) ; AC17 à confirmer par la CI de la PR.
+- Tests passing: yes en local (composer test, composer lint, npm run test, npm run lint, npm run build) ; AC17 confirmé par la CI de la PR #8 (backend MySQL, frontend, e2e, docker verts).
 
 Notes d'implémentation :
 - Aucun appel réseau réel dans les tests : `Http::preventStrayRequests()` + `Http::fake()` dans chaque fichier Google Books.
 - Un 404 de Google (volume ou image) est journalisé `not_found` ; `ConnectionException` (délai, DNS, connexion refusée) est journalisé `timeout`.
 - Le téléchargement de la couverture coupe le transfert dès que la taille dépasse la limite (option `progress` de Guzzle), en plus des contrôles `Content-Length` et de la taille lue (seuls ces derniers sont exerçables avec `Http::fake()`).
 - `BookService::create|update` reçoivent un `BookCoverInput` (fichier, retrait, couverture Google) et renvoient un `SavedBook` (`googleCoverMissing` pour le toast). Deux tests Vitest de F06 qui comparaient la charge utile exacte ont été complétés avec `google_volume_id` et `use_google_cover` (aucun retiré).
+- MySQL réordonne les clés d'un objet JSON stocké : les tests comparent `google_books_data` avec `toEqual` (pas `toBe`), sinon ils passent sous SQLite et échouent en CI.
 - Playwright inchangé : le parcours « ajout livre » en saisie manuelle reste valide ; tester la recherche demanderait un vrai appel à Google ou un faux serveur.
