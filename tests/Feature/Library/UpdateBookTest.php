@@ -138,3 +138,19 @@ it('refuses a bookshelf of another user and changes nothing', function () {
 
     expect($book->bookshelves()->pluck('bookshelves.id')->all())->toBe([$own->id]);
 });
+
+it('keeps the previous cover and removes the new file when saving the book fails', function () {
+    $book = signedInBookWithCover();
+    Book::saving(fn () => throw new RuntimeException('Database unavailable'));
+
+    patch(route('library.books.update', $book), [
+        'title' => 'Fondation et Empire',
+        'author' => 'Isaac Asimov',
+        'cover' => UploadedFile::fake()->image('new.jpg', 1200, 1800),
+    ])->assertServerError();
+
+    $book->refresh();
+    expect($book->title)->toBe('Fondation')
+        ->and($book->cover_path)->toBe('covers/original.jpg')
+        ->and(Storage::disk('public')->allFiles())->toBe(['covers/original.jpg']);
+});

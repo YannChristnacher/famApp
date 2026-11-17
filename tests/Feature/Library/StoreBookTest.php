@@ -151,3 +151,19 @@ it('never lets the user fill the owner nor the Google Books data', function () {
         ->and($book->google_books_data)->toBeNull()
         ->and($book->cover_path)->toBeNull();
 });
+
+it('leaves no cover file behind when saving the book fails', function () {
+    $user = signIn();
+    $fantasy = Bookshelf::factory()->for($user)->create();
+    Book::saving(fn () => throw new RuntimeException('Database unavailable'));
+
+    post(route('library.books.store'), [
+        'title' => 'Dune',
+        'author' => 'Frank Herbert',
+        'bookshelf_ids' => [$fantasy->id],
+        'cover' => UploadedFile::fake()->image('cover.jpg', 1200, 1800),
+    ])->assertServerError();
+
+    expect(Book::query()->count())->toBe(0)
+        ->and(Storage::disk('public')->allFiles())->toBe([]);
+});
