@@ -264,6 +264,8 @@
 - La cascade SQL ne supprime pas les fichiers : tout nouveau chemin de suppression de livre (ou de compte) doit appeler `BookCoverService::delete`.
 - `UploadedFile::fake()->image()` est opaque : `transparentPng()` pour tester le fond blanc.
 - Étagère d'un autre dans `bookshelf_ids` : `Rule::exists(...)->where('user_id', …)` obligatoire, sinon on range son livre sur l'étagère d'un autre.
+- Taille des envois : 25 Mo pour tout le site (nginx `client_max_body_size`, PHP `post_max_size`), routes visiteurs comprises. **Toute nouvelle route d'upload volumineux doit avoir son propre bloc nginx** (modèle : `location ~ ^/garage/tools(/\d+)?$`, 90 Mo, F10) qui passe directement à `index.php` (pas de `try_files` : la taille est contrôlée dans la location qui lit le corps) et relève `post_max_size` par `PHP_VALUE`. Ne jamais relever la limite globale. `PHP_VALUE` reste dans le processus PHP-FPM pour les requêtes suivantes : n'y mettre que des valeurs sans effet ailleurs (`post_max_size`, déjà borné par nginx), pas `upload_max_filesize`.
+- Donnée partagée créée pendant un enregistrement (marque d'outil) : la créer dans la transaction, après l'écriture des fichiers, pour qu'un échec ne laisse rien ; après une violation d'unicité, relire avec `lockForUpdate()` (une lecture simple en REPEATABLE READ ne voit pas la ligne de la requête concurrente).
 
 ### Appels externes et Google Books (relevés en relecture F07)
 - SSRF : ne télécharger qu'en https, hôte exact de `cover_hosts`, sans identifiants ni port ; refuser aussi chaque redirection non conforme, **avant** toute requête vers l'hôte. Google liste ses images en `http://` : relever en https seulement pour un hôte autorisé.
