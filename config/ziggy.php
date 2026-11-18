@@ -40,6 +40,8 @@ $authenticatedRoutes = [
     'garage.tools.edit',
     'garage.tools.update',
     'garage.tools.destroy',
+    'family.index',
+    'family.members.show',
 ];
 
 // Printed only to administrators, on top of the signed-in routes.

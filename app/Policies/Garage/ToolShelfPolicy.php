@@ -7,11 +7,17 @@ use App\Models\User;
 use Illuminate\Auth\Access\Response;
 
 /**
- * Only the owner changes a tool shelf. Anyone else, admins included, gets a
- * 404, so that the garages of other members are not revealed.
+ * Every signed-in member, admins included, sees the tool shelves of the family
+ * (F11); only the owner changes, deletes or moves one. Anyone else, admins
+ * included, gets a 404.
  */
 class ToolShelfPolicy
 {
+    public function view(User $user, ToolShelf $shelf): Response
+    {
+        return Response::allow();
+    }
+
     public function update(User $user, ToolShelf $shelf): Response
     {
         return $this->ownerOnly($user, $shelf);

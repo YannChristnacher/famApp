@@ -7,14 +7,15 @@ use App\Models\User;
 use Illuminate\Auth\Access\Response;
 
 /**
- * Only the owner sees and changes a book (the read-only view of the other
- * members comes with F11). Anyone else gets a 404.
+ * Every signed-in member, admins included, reads the books of the family
+ * (F11); only the owner changes or deletes one. Anyone else gets a 404, so
+ * that a write never reveals more than the read-only pages.
  */
 class BookPolicy
 {
     public function view(User $user, Book $book): Response
     {
-        return $this->ownerOnly($user, $book);
+        return Response::allow();
     }
 
     public function update(User $user, Book $book): Response

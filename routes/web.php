@@ -5,7 +5,9 @@ use App\Http\Controllers\Admin\AccountRequestController as AdminAccountRequestCo
 use App\Http\Controllers\Auth\AccountRequestController;
 use App\Http\Controllers\Auth\AuthPageController;
 use App\Http\Controllers\Auth\InvitationController;
+use App\Http\Controllers\Core\FamilyController;
 use App\Http\Controllers\Core\HomeController;
+use App\Http\Controllers\Core\MemberController;
 use App\Http\Controllers\Garage\GarageController;
 use App\Http\Controllers\Garage\ToolController;
 use App\Http\Controllers\Garage\ToolShelfController;
@@ -81,6 +83,12 @@ Route::middleware('auth')->group(function () {
             ->name('shelves.move');
 
         Route::resource('tools', ToolController::class);
+    });
+
+    // Read-only pages of the family: every member sees the others' library and garage.
+    Route::prefix('family')->name('family.')->group(function () {
+        Route::get('/', FamilyController::class)->name('index');
+        Route::get('/{member}', MemberController::class)->name('members.show');
     });
 });
 
