@@ -63,7 +63,7 @@ class ToolService
         $photos = $this->storeNewPhotos($input->photos);
 
         return $this->withNewPhotos($photos, fn () => DB::transaction(function () use ($user, $input, $photos) {
-            $tool = $user->tools()->make(['name' => $input->name]);
+            $tool = $user->tools()->make(['name' => $input->name, 'comment' => $input->comment]);
             $this->saveDetails($tool, $input, $this->brands->resolve($input->brand));
             $this->savePhotos($tool, $photos, collect());
 
@@ -77,7 +77,7 @@ class ToolService
 
         $removedPaths = $this->withNewPhotos($photos, fn () => DB::transaction(function () use ($tool, $input, $photos) {
             $this->lock($tool);
-            $tool->fill(['name' => $input->name]);
+            $tool->fill(['name' => $input->name, 'comment' => $input->comment]);
             $this->saveDetails($tool, $input, $this->brands->resolve($input->brand));
 
             return $this->savePhotos($tool, $photos, $tool->photos()->get()->keyBy('id')->toBase());

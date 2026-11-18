@@ -4,11 +4,11 @@ import { route } from 'ziggy-js'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
 import BookCover from '@/components/Library/BookCover.vue'
 import BookDeleteModal from '@/components/Library/BookDeleteModal.vue'
-import type { Book } from '@/types/library'
+import type { BookDetails } from '@/types/library'
 import type { Member } from '@/types/family'
 
 const props = defineProps<{
-  book: Book
+  book: BookDetails
   /** The member the book belongs to. */
   owner: Member
   /** True for the owner only: the page is read-only for the rest of the family. */
@@ -94,6 +94,16 @@ const deleteOpen = ref(false)
                   class="text-muted"
                 >Rangé sur aucune étagère</span>
               </dd>
+            </div>
+            <div v-if="book.comment">
+              <dt class="font-medium text-highlighted">
+                Commentaire
+              </dt>
+              <dd
+                class="mt-1 whitespace-pre-line break-words text-muted"
+                data-testid="book-comment"
+                v-text="book.comment"
+              />
             </div>
           </dl>
 

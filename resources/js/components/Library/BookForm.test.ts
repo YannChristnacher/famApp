@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { VisitOptions } from '@inertiajs/core'
 import { router } from '@inertiajs/vue3'
 import { mountWithUi } from '@/test/mountWithUi'
-import type { Book, Bookshelf } from '@/types/library'
+import type { BookDetails, Bookshelf } from '@/types/library'
 import BookForm from './BookForm.vue'
 
 const bookshelves: Bookshelf[] = [
@@ -11,16 +11,17 @@ const bookshelves: Bookshelf[] = [
   { id: 2, name: 'Coup de cœur', position: 3 },
 ]
 
-const book: Book = {
+const book: BookDetails = {
   id: 7,
   title: 'Le Hobbit',
   author: 'J. R. R. Tolkien',
   isbn: '207036822X',
   cover_url: '/storage/covers/hobbit.jpg',
   bookshelves: [{ id: 4, name: 'Fantasy' }],
+  comment: 'Dédicacé',
 }
 
-async function mountForm(props: { book: Book | null, bookshelves?: Bookshelf[] }) {
+async function mountForm(props: { book: BookDetails | null, bookshelves?: Bookshelf[] }) {
   return mountWithUi(BookForm, { props: { bookshelves, ...props }, attachTo: document.body })
 }
 
@@ -47,6 +48,10 @@ async function chooseCover(wrapper: FormWrapper, file: File): Promise<void> {
   const input = wrapper.find('input[type="file"]')
   Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
   await input.trigger('change')
+}
+
+function commentField(wrapper: FormWrapper) {
+  return wrapper.find('textarea[name="comment"]')
 }
 
 function spyOnPost() {
@@ -78,6 +83,7 @@ describe('Library/BookForm', () => {
     await wrapper.find('input[name="isbn"]').setValue('978-2-07-036822-8')
     await chooseBookshelves(wrapper, ['Polars', 'Coup de cœur'])
     await chooseCover(wrapper, cover)
+    await commentField(wrapper).setValue('Abîmé\nÀ relier')
 
     await vi.waitFor(() => expect(wrapper.find('img[src="blob:cover-preview"]').exists()).toBe(true))
     expect(wrapper.find('[data-testid="bookshelf-select"]').text()).toContain('Polars')
@@ -94,6 +100,7 @@ describe('Library/BookForm', () => {
       title: 'Dune',
       author: 'Frank Herbert',
       isbn: '978-2-07-036822-8',
+      comment: 'Abîmé\nÀ relier',
       bookshelf_ids: [9, 2],
       cover,
       remove_cover: false,
@@ -112,6 +119,25 @@ describe('Library/BookForm', () => {
 
     await vi.waitFor(() => expect(post).toHaveBeenCalled())
     expect(postedData(post)).toMatchObject({ bookshelf_ids: [], cover: null })
+  })
+
+  it('offers an optional comment field with a character counter', async () => {
+    const wrapper = await mountForm({ book: null })
+    const label = wrapper.findAll('label').find((element) => element.text().startsWith('Commentaire'))
+
+    expect(label?.attributes('for')).toBe(commentField(wrapper).attributes('id'))
+    expect(commentField(wrapper).attributes('required')).toBeUndefined()
+    expect(commentField(wrapper).attributes('maxlength')).toBe('2000')
+    expect(wrapper.find('[data-testid="comment-counter"]').text()).toBe('0 / 2000')
+
+    await commentField(wrapper).setValue('Abîmé')
+
+    expect(wrapper.find('[data-testid="comment-counter"]').text()).toBe('5 / 2000')
+  })
+
+  it('prefills the comment of an edited book, empty without comment', async () => {
+    expect((commentField(await mountForm({ book })).element as HTMLTextAreaElement).value).toBe('Dédicacé')
+    expect((commentField(await mountForm({ book: { ...book, comment: null } })).element as HTMLTextAreaElement).value).toBe('')
   })
 
   it('explains that a member without bookshelf keeps the book off the shelves', async () => {
@@ -159,6 +185,7 @@ describe('Library/BookForm', () => {
       title: 'Le Hobbit',
       author: 'J. R. R. Tolkien',
       isbn: '207036822X',
+      comment: 'Dédicacé',
       bookshelf_ids: [4, 9],
       cover: null,
       remove_cover: false,

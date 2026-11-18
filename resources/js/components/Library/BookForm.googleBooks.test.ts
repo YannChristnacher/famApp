@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { router } from '@inertiajs/vue3'
 import { mountWithUi } from '@/test/mountWithUi'
-import type { Book, GoogleBooksLookup } from '@/types/library'
+import type { BookDetails, GoogleBooksLookup } from '@/types/library'
 import BookForm from './BookForm.vue'
 
 const hobbit: GoogleBooksLookup = {
@@ -11,13 +11,14 @@ const hobbit: GoogleBooksLookup = {
   cover_url: 'https://books.google.com/books/content?id=zyTCAlFPjgYC&img=1',
 }
 
-const book: Book = {
+const book: BookDetails = {
   id: 7,
   title: 'Bilbo',
   author: 'Tolkien',
   isbn: '9782070368228',
   cover_url: '/storage/covers/bilbo.jpg',
   bookshelves: [],
+  comment: null,
 }
 
 function stubLookup(status: number, body: unknown) {
@@ -30,7 +31,7 @@ function stubLookup(status: number, body: unknown) {
   return fetchMock
 }
 
-async function mountForm(edited: Book | null = null) {
+async function mountForm(edited: BookDetails | null = null) {
   return mountWithUi(BookForm, { props: { book: edited, bookshelves: [] }, attachTo: document.body })
 }
 

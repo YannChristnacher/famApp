@@ -24,6 +24,7 @@ use Illuminate\Support\Carbon;
  * @property string $title
  * @property string $author
  * @property string|null $isbn
+ * @property string|null $comment Free text of the owner, shown on the page of the book.
  * @property string|null $cover_path Path on the public disk.
  * @property array<string, mixed>|null $google_books_data
  * @property Carbon|null $created_at
@@ -31,7 +32,7 @@ use Illuminate\Support\Carbon;
  * @property-read User $user
  * @property-read Collection<int, Bookshelf> $bookshelves
  */
-#[Fillable(['title', 'author', 'isbn'])]
+#[Fillable(['title', 'author', 'isbn', 'comment'])]
 #[UseFactory(BookFactory::class)]
 #[UsePolicy(BookPolicy::class)]
 class Book extends Model

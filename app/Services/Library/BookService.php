@@ -40,7 +40,7 @@ class BookService
     }
 
     /**
-     * @param  array{title: string, author: string, isbn: string|null}  $attributes
+     * @param  array{title: string, author: string, isbn: string|null, comment: string|null}  $attributes
      * @param  list<int>  $bookshelfIds  Bookshelves of the member (validated).
      * @param  string|null  $googleVolumeId  Volume chosen by a lookup: its data is fetched by the server.
      *
@@ -69,7 +69,7 @@ class BookService
     /**
      * Without a Google volume, the raw data already stored is kept.
      *
-     * @param  array{title: string, author: string, isbn: string|null}  $attributes
+     * @param  array{title: string, author: string, isbn: string|null, comment: string|null}  $attributes
      * @param  list<int>  $bookshelfIds  Bookshelves of the member (validated).
      *
      * @throws ValidationException When Google cannot confirm the volume (nothing is written).

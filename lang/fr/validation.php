@@ -178,6 +178,7 @@ return [
         'body'                     => 'corps',
         'city'                     => 'ville',
         'color'                    => 'color',
+        'comment'                  => 'commentaire',
         'company'                  => 'entreprise',
         'compilation'              => 'compilation',
         'concept'                  => 'concept',

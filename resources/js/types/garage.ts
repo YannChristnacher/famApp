@@ -56,6 +56,8 @@ export interface ToolAccessory {
 export interface ToolDetails extends Tool {
   photos: ToolPhoto[]
   accessories: ToolAccessory[]
+  /** Free text of the owner (plain text, line breaks kept), null without comment. */
+  comment: string | null
 }
 
 /** Filters of the list of tools (ids, null when not filtered). */

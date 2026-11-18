@@ -25,11 +25,14 @@ const props = defineProps<{
 /** Limits of App\Http\Requests\Garage\ToolRequest. */
 const MAX_PHOTOS = 8
 const MAX_ACCESSORIES = 30
+const COMMENT_MAX_LENGTH = 2000
 
 interface ToolFormData {
   name: string
   /** Typed brand: matched by the server on the shared brands, created otherwise. */
   brand: string | null
+  /** Trimmed by the server, saved as null when blank. */
+  comment: string
   shelf_ids: number[]
   accessories: AccessoryRow[]
   photos: PhotoRow[]
@@ -38,6 +41,7 @@ interface ToolFormData {
 const form = useForm<ToolFormData>({
   name: props.tool?.name ?? '',
   brand: props.tool?.brand?.name ?? null,
+  comment: props.tool?.comment ?? '',
   shelf_ids: props.tool?.shelves.map((shelf) => shelf.id) ?? [],
   accessories: props.tool?.accessories.map((accessory) => accessoryRow(accessory.name)) ?? [],
   photos: props.tool?.photos.map((photo) => ({ key: nextRowKey(), id: photo.id, url: photo.url })) ?? [],
@@ -75,6 +79,7 @@ function payload(data: ToolFormData) {
   return {
     name: data.name,
     brand: data.brand,
+    comment: data.comment,
     shelf_ids: data.shelf_ids,
     accessories: data.accessories.map((row) => row.name),
     photos: data.photos.map((row) => ('file' in row ? { file: row.file } : { id: row.id })),
@@ -166,6 +171,26 @@ function submit(): void {
       :errors="errors"
       :max="MAX_ACCESSORIES"
     />
+
+    <UFormField
+      label="Commentaire"
+      name="comment"
+      help="Facultatif, visible par toute la famille."
+      :error="form.errors.comment"
+    >
+      <template #hint>
+        <span data-testid="comment-counter">{{ form.comment.length }} / {{ COMMENT_MAX_LENGTH }}</span>
+      </template>
+      <UTextarea
+        v-model="form.comment"
+        name="comment"
+        :maxlength="COMMENT_MAX_LENGTH"
+        :rows="3"
+        autoresize
+        placeholder="État, réglages, consommables…"
+        class="w-full"
+      />
+    </UFormField>
 
     <ToolPhotosField
       v-model="form.photos"

@@ -6,19 +6,24 @@ import { route } from 'ziggy-js'
 import BookCover from '@/components/Library/BookCover.vue'
 import IsbnScannerModal from '@/components/Library/IsbnScannerModal.vue'
 import { useGoogleBooksLookup } from '@/composables/useGoogleBooksLookup'
-import type { Book, Bookshelf, GoogleBooksLookup } from '@/types/library'
+import type { BookDetails, Bookshelf, GoogleBooksLookup } from '@/types/library'
 
 const props = defineProps<{
   /** The edited book, null to create one. */
-  book: Book | null
+  book: BookDetails | null
   /** The bookshelves of the member, by position. */
   bookshelves: Bookshelf[]
 }>()
+
+/** Limit of App\Http\Requests\Library\BookRequest. */
+const COMMENT_MAX_LENGTH = 2000
 
 interface BookFormData {
   title: string
   author: string
   isbn: string
+  /** Trimmed by the server, saved as null when blank. */
+  comment: string
   bookshelf_ids: number[]
   cover: File | null
   remove_cover: boolean
@@ -32,6 +37,7 @@ const form = useForm<BookFormData>({
   title: props.book?.title ?? '',
   author: props.book?.author ?? '',
   isbn: props.book?.isbn ?? '',
+  comment: props.book?.comment ?? '',
   bookshelf_ids: props.book?.bookshelves.map((bookshelf) => bookshelf.id) ?? [],
   cover: null,
   remove_cover: false,
@@ -243,6 +249,26 @@ function submit(): void {
         data-testid="google-books-result"
         @update:open="unlinkGoogleBook"
       />
+
+      <UFormField
+        label="Commentaire"
+        name="comment"
+        help="Facultatif, visible par toute la famille."
+        :error="form.errors.comment"
+      >
+        <template #hint>
+          <span data-testid="comment-counter">{{ form.comment.length }} / {{ COMMENT_MAX_LENGTH }}</span>
+        </template>
+        <UTextarea
+          v-model="form.comment"
+          name="comment"
+          :maxlength="COMMENT_MAX_LENGTH"
+          :rows="3"
+          autoresize
+          placeholder="Édition, état, dédicace…"
+          class="w-full"
+        />
+      </UFormField>
 
       <UFormField
         label="Étagères"

@@ -7,6 +7,7 @@ use App\Http\Requests\Library\ListBooksRequest;
 use App\Http\Requests\Library\StoreBookRequest;
 use App\Http\Requests\Library\UpdateBookRequest;
 use App\Http\Resources\Core\MemberResource;
+use App\Http\Resources\Library\BookDetailsResource;
 use App\Http\Resources\Library\BookResource;
 use App\Http\Resources\Library\BookshelfResource;
 use App\Models\Library\Book;
@@ -77,7 +78,7 @@ class BookController extends Controller
         Gate::authorize('view', $book);
 
         return Inertia::render('Library/Books/Show', [
-            'book' => (new BookResource($book->load('bookshelves')))->resolve(),
+            'book' => (new BookDetailsResource($book->load('bookshelves')))->resolve(),
             'owner' => (new MemberResource($book->user))->resolve(),
             'editable' => Gate::allows('update', $book),
         ]);
@@ -90,7 +91,7 @@ class BookController extends Controller
         $user = $request->user();
 
         return Inertia::render('Library/Books/Edit', [
-            'book' => (new BookResource($book->load('bookshelves')))->resolve(),
+            'book' => (new BookDetailsResource($book->load('bookshelves')))->resolve(),
             'bookshelves' => $this->bookshelvesOf($user),
         ]);
     }

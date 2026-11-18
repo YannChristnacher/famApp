@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises } from '@vue/test-utils'
 import { mountWithUi } from '@/test/mountWithUi'
 import { createBookBarcodeDetector } from '@/support/library/barcodeDetector'
-import type { Book, GoogleBooksLookup } from '@/types/library'
+import type { BookDetails, GoogleBooksLookup } from '@/types/library'
 import BookForm from './BookForm.vue'
 
 vi.mock('@/support/library/barcodeDetector', async (importOriginal) => ({
@@ -19,13 +19,14 @@ const hobbit: GoogleBooksLookup = {
   cover_url: null,
 }
 
-const book: Book = {
+const book: BookDetails = {
   id: 7,
   title: 'Bilbo',
   author: 'Tolkien',
   isbn: null,
   cover_url: null,
   bookshelves: [],
+  comment: null,
 }
 
 function stubLookup() {
@@ -56,7 +57,7 @@ function stubScanner(rawValue: string) {
   return tracks
 }
 
-async function mountForm(edited: Book | null = null) {
+async function mountForm(edited: BookDetails | null = null) {
   return mountWithUi(BookForm, { props: { book: edited, bookshelves: [] }, attachTo: document.body })
 }
 

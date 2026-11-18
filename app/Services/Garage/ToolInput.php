@@ -6,8 +6,9 @@ use Illuminate\Http\UploadedFile;
 
 /**
  * What the member saves for a tool (validated): its name, the typed brand,
- * their shelves, the accessories and the photos, each list in its order. A
- * photo is the id of a photo of this tool to keep, or a new file.
+ * their shelves, the accessories and the photos, each list in its order, and
+ * the comment (null without comment). A photo is the id of a photo of this
+ * tool to keep, or a new file.
  */
 final readonly class ToolInput
 {
@@ -22,5 +23,6 @@ final readonly class ToolInput
         public array $shelfIds = [],
         public array $accessories = [],
         public array $photos = [],
+        public ?string $comment = null,
     ) {}
 }

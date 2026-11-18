@@ -49,6 +49,7 @@ it('renders the page of a tool with its photos and accessories in order', functi
             ['id' => $accessories[0]->id, 'name' => 'Mallette'],
             ['id' => $accessories[1]->id, 'name' => 'Chargeur'],
         ],
+        'comment' => null,
     ];
 
     get(route('garage.tools.show', $tool))
