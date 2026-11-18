@@ -95,5 +95,8 @@ globalThis.Ziggy = {
       methods: ['POST'],
       parameters: ['accountRequest'],
     },
+    'admin.control': { uri: 'admin/control', methods: ['GET', 'HEAD'] },
+    'admin.failed-jobs.retry': { uri: 'admin/failed-jobs/{uuid}/retry', methods: ['POST'], parameters: ['uuid'] },
+    'admin.failed-jobs.destroy': { uri: 'admin/failed-jobs/{uuid}', methods: ['DELETE'], parameters: ['uuid'] },
   },
 }
