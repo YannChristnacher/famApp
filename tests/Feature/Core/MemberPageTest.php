@@ -123,7 +123,7 @@ it('marks the page of the signed-in member as their own', function () {
 it('answers 404 for a member that does not exist', function () {
     signIn();
 
-    get(route('family.members.show', 999))->assertNotFound();
+    get(route('family.members.show', (int) User::query()->max('id') + 1))->assertNotFound();
 });
 
 it('filters the books and the tools of the member by shelf', function () {
@@ -153,6 +153,22 @@ it('opens the library tab for any other tab value', function (string $tab) {
 })->with(['library', 'admin', '']);
 
 /**
+ * A shelf of `$member` in the other module whose id no shelf of this module
+ * has (ids are not reset between tests under MySQL, so they may collide).
+ *
+ * @param  class-string<Bookshelf|ToolShelf>  $otherModule
+ * @param  class-string<Bookshelf|ToolShelf>  $module
+ */
+function otherModuleShelfId(string $otherModule, string $module, User $member): int
+{
+    do {
+        $id = $otherModule::factory()->for($member)->create()->id;
+    } while ($module::query()->whereKey($id)->exists());
+
+    return $id;
+}
+
+/**
  * A filter value that is not one of the shelves of `$member` in `$module`.
  */
 function foreignShelfFilter(string $case, string $module, User $member, User $viewer): mixed
@@ -163,12 +179,8 @@ function foreignShelfFilter(string $case, string $module, User $member, User $vi
     return match ($case) {
         'shelf of the viewer' => $shelf::factory()->for($viewer)->create()->id,
         'shelf of a third member' => $shelf::factory()->for(User::factory())->create()->id,
-        // A new id, so that no shelf of `$module` has the same.
-        'shelf of the member in the other module' => tap(
-            $otherModule::factory()->for($member)->create()->id,
-            fn (int $id) => expect($shelf::query()->find($id))->toBeNull(),
-        ),
-        'unknown' => 999,
+        'shelf of the member in the other module' => otherModuleShelfId($otherModule, $shelf, $member),
+        'unknown' => (int) $shelf::query()->max('id') + 1000,
         'not an integer' => 'fantasy',
         'array' => [1],
         default => throw new InvalidArgumentException($case),
