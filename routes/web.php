@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\AuthPageController;
 use App\Http\Controllers\Auth\InvitationController;
 use App\Http\Controllers\Core\HomeController;
 use App\Http\Controllers\Garage\GarageController;
+use App\Http\Controllers\Garage\ToolController;
 use App\Http\Controllers\Garage\ToolShelfController;
 use App\Http\Controllers\Garage\ToolShelfPositionController;
 use App\Http\Controllers\Library\BookController;
@@ -78,6 +79,8 @@ Route::middleware('auth')->group(function () {
         Route::resource('shelves', ToolShelfController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::patch('/shelves/{shelf}/move', [ToolShelfPositionController::class, 'update'])
             ->name('shelves.move');
+
+        Route::resource('tools', ToolController::class);
     });
 });
 

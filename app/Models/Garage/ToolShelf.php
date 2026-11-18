@@ -10,16 +10,18 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Attributes\UsePolicy;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Carbon;
 
 /**
  * A shelf of the garage of a member, named freely ("Électroportatif",
  * "Manuel"…); the garage of a member is the set of their tool shelves,
- * ordered by position (1..n, unique per member). A tool will be able to sit
- * on several shelves (F10, pivot tool_tool_shelf).
+ * ordered by position (1..n, unique per member). A tool may sit on several
+ * shelves (pivot tool_tool_shelf); deleting a shelf only removes the links.
  *
  * The name is unique per member once normalized (normalized_name, kept in
  * sync by the name mutator): case and repeated spaces are ignored, accents
@@ -33,6 +35,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read User $user
+ * @property-read Collection<int, Tool> $tools
  */
 #[Fillable(['name'])]
 #[UseFactory(ToolShelfFactory::class)]
@@ -74,6 +77,14 @@ class ToolShelf extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return BelongsToMany<Tool, $this>
+     */
+    public function tools(): BelongsToMany
+    {
+        return $this->belongsToMany(Tool::class)->orderBy('name')->orderBy('tools.id');
     }
 
     public function isOwnedBy(User $user): bool

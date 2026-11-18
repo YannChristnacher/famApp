@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Rules\Library\Isbn;
 use App\Services\Library\BookCoverInput;
 use App\Services\Library\GoogleBooksService;
+use App\Support\ImageUploadRules;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
@@ -24,10 +25,9 @@ abstract class BookRequest extends FormRequest
 {
     public const TEXT_MAX_LENGTH = 255;
 
-    public const COVER_MAX_KILOBYTES = 10 * 1024;
+    public const COVER_MAX_KILOBYTES = ImageUploadRules::MAX_KILOBYTES;
 
-    /** Beyond this size, decoding the image would take too much memory. */
-    public const COVER_MAX_PIXELS_PER_SIDE = 6000;
+    public const COVER_MAX_PIXELS_PER_SIDE = ImageUploadRules::MAX_PIXELS_PER_SIDE;
 
     /**
      * @return array<string, array<int, string|ValidationRule|Exists|File|Dimensions>>
@@ -47,13 +47,7 @@ abstract class BookRequest extends FormRequest
                 'distinct',
                 Rule::exists('bookshelves', 'id')->where('user_id', $user->id),
             ],
-            'cover' => [
-                'nullable',
-                File::image()->types(['jpeg', 'png', 'webp'])->max(self::COVER_MAX_KILOBYTES),
-                Rule::dimensions()
-                    ->maxWidth(self::COVER_MAX_PIXELS_PER_SIDE)
-                    ->maxHeight(self::COVER_MAX_PIXELS_PER_SIDE),
-            ],
+            'cover' => ['nullable', ...ImageUploadRules::rules()],
             'google_volume_id' => ['nullable', 'string', 'regex:'.GoogleBooksService::VOLUME_ID_PATTERN],
             'use_google_cover' => ['boolean'],
         ];

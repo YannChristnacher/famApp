@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Role;
+use App\Models\Garage\Tool;
 use App\Models\Garage\ToolShelf;
 use App\Models\Library\Book;
 use App\Models\Library\Bookshelf;
@@ -84,6 +85,14 @@ class User extends Authenticatable
     public function books(): HasMany
     {
         return $this->hasMany(Book::class);
+    }
+
+    /**
+     * @return HasMany<Tool, $this>
+     */
+    public function tools(): HasMany
+    {
+        return $this->hasMany(Tool::class);
     }
 
     public function isAdmin(): bool

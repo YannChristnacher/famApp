@@ -43,7 +43,7 @@ it('never lists the bookshelves of the library', function () {
         ->assertInertia(fn (Assert $page) => $page->component('Garage/Shelves/Index')->has('shelves', 0));
 });
 
-it('opens the garage on the shelves page', function (bool $admin) {
+it('opens the garage on the tools of the member', function (bool $admin) {
     actingAs($admin ? User::factory()->admin()->create() : User::factory()->create());
 
     get(route('garage.index'))->assertRedirect(route('garage.tools.index'));
