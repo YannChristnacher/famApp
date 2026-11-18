@@ -10,23 +10,23 @@ Chaque membre inventorie ses outils dans le module Garage : nom, une ou plusieur
 - Glisser-déposer : les photos et accessoires se réordonnent par boutons monter/descendre (comme les étagères).
 
 ## Acceptance criteria
-- [ ] AC1: Given un membre connecté, when il ouvre `/garage`, then il est redirigé vers `garage.tools.index` (« Mes outils ») ; un invité est redirigé vers la connexion sur toutes les routes `garage.tools.*`.
-- [ ] AC2: Given des outils de plusieurs membres, when un membre ouvre « Mes outils », then il ne voit que les siens, triés par nom puis id, chacun avec sa vignette (première photo ou `null`), sa marque et ses étagères ; le nombre de requêtes ne dépend pas du nombre d'outils.
-- [ ] AC3: Given ses étagères et ses marques, when il filtre par `?shelf=<id>` et/ou `?brand=<id>`, then seuls les outils correspondants s'affichent ; une étagère ou une marque qui n'est pas la sienne / pas utilisée par ses outils, inconnue ou non entière répond 404. Les filtres de marque proposés sont les marques de ses outils seulement.
-- [ ] AC4: Given le formulaire de création, when il envoie nom, marque, accessoires, étagères et photos valides, then l'outil est créé pour lui (jamais pour un `user_id` posté), avec ses accessoires et photos dans l'ordre envoyé, puis il est redirigé vers la fiche avec un toast.
-- [ ] AC5: Given une marque saisie, when elle correspond à une marque existante une fois normalisée (« bosch », « BOSCH  »), then la marque existante est réutilisée ; sinon une marque est créée avec la casse saisie ; une marque vide laisse l'outil sans marque ; deux créations concurrentes du même nom aboutissent à une seule marque.
-- [ ] AC6: Given un outil, when il est modifié ou supprimé, then aucune marque n'est jamais supprimée.
-- [ ] AC7: Given des accessoires, when ils sont envoyés, then ils sont enregistrés dans l'ordre (positions 1..n) et remplacent les précédents (ajout, retrait, réordonnancement) ; un nom vide, de plus de 100 caractères, ou plus de 30 lignes est refusé.
-- [ ] AC8: Given des photos, when elles sont envoyées (8 au plus, JPEG/PNG/WebP, 10 Mo et 6000 px max), then chacune est redimensionnée (1200 px de large max), réencodée en JPEG sans EXIF sous un nom aléatoire sur le disque `public`, dans l'ordre envoyé ; la première est la vignette.
-- [ ] AC9: Given un outil avec photos, when il est modifié avec une liste ordonnée mêlant photos existantes (`id`) et nouvelles (`file`), then l'ordre est appliqué, les photos absentes sont supprimées (lignes et fichiers, après le commit) ; un id de photo d'un autre outil est refusé (erreur de validation) et l'autre outil est intact.
-- [ ] AC10: Given une écriture qui échoue en base, when des photos neuves ont été écrites, then elles sont supprimées du disque et les anciennes restent.
-- [ ] AC11: Given un outil, when il est supprimé (confirmation), then l'outil, ses photos (lignes et fichiers), ses accessoires et ses liens d'étagère disparaissent ; ses étagères et sa marque restent ; retour à la liste avec toast.
-- [ ] AC12: Given une étagère d'un autre membre (ou de la bibliothèque) dans `shelf_ids`, then erreur de validation, rien n'est écrit.
-- [ ] AC13: Given l'outil d'un autre membre, when un membre ou un admin ouvre la fiche, le formulaire, modifie ou supprime, then 404 et rien ne change (Policy `ToolPolicy`).
-- [ ] AC14: Given les routes `garage.tools.*`, then elles sont exposées à Ziggy pour les connectés et absentes pour un invité.
-- [ ] AC15: Given F06, when le pipeline d'image est extrait dans un service partagé, then les tests de `BookCoverService` passent inchangés.
-- [ ] AC16 (Vitest): liste (cartes, vignette ou image neutre, filtres, états vides), formulaire (marque existante / créée, lignes d'accessoires, photos avec aperçus, ordre et retrait, charge utile envoyée en `POST` + `_method=patch` en modification), fiche (galerie, accessoires, étagères), confirmation de suppression.
-- [ ] AC17 (Playwright): connexion, création d'une étagère, puis d'un outil avec une marque créée à la volée, un accessoire, l'étagère et une photo ; l'outil apparaît dans la liste avec sa vignette.
+- [x] AC1: Given un membre connecté, when il ouvre `/garage`, then il est redirigé vers `garage.tools.index` (« Mes outils ») ; un invité est redirigé vers la connexion sur toutes les routes `garage.tools.*`.
+- [x] AC2: Given des outils de plusieurs membres, when un membre ouvre « Mes outils », then il ne voit que les siens, triés par nom puis id, chacun avec sa vignette (première photo ou `null`), sa marque et ses étagères ; le nombre de requêtes ne dépend pas du nombre d'outils.
+- [x] AC3: Given ses étagères et ses marques, when il filtre par `?shelf=<id>` et/ou `?brand=<id>`, then seuls les outils correspondants s'affichent ; une étagère ou une marque qui n'est pas la sienne / pas utilisée par ses outils, inconnue ou non entière répond 404. Les filtres de marque proposés sont les marques de ses outils seulement.
+- [x] AC4: Given le formulaire de création, when il envoie nom, marque, accessoires, étagères et photos valides, then l'outil est créé pour lui (jamais pour un `user_id` posté), avec ses accessoires et photos dans l'ordre envoyé, puis il est redirigé vers la fiche avec un toast.
+- [x] AC5: Given une marque saisie, when elle correspond à une marque existante une fois normalisée (« bosch », « BOSCH  »), then la marque existante est réutilisée ; sinon une marque est créée avec la casse saisie ; une marque vide laisse l'outil sans marque ; deux créations concurrentes du même nom aboutissent à une seule marque.
+- [x] AC6: Given un outil, when il est modifié ou supprimé, then aucune marque n'est jamais supprimée.
+- [x] AC7: Given des accessoires, when ils sont envoyés, then ils sont enregistrés dans l'ordre (positions 1..n) et remplacent les précédents (ajout, retrait, réordonnancement) ; un nom vide, de plus de 100 caractères, ou plus de 30 lignes est refusé.
+- [x] AC8: Given des photos, when elles sont envoyées (8 au plus, JPEG/PNG/WebP, 10 Mo et 6000 px max), then chacune est redimensionnée (1200 px de large max), réencodée en JPEG sans EXIF sous un nom aléatoire sur le disque `public`, dans l'ordre envoyé ; la première est la vignette.
+- [x] AC9: Given un outil avec photos, when il est modifié avec une liste ordonnée mêlant photos existantes (`id`) et nouvelles (`file`), then l'ordre est appliqué, les photos absentes sont supprimées (lignes et fichiers, après le commit) ; un id de photo d'un autre outil est refusé (erreur de validation) et l'autre outil est intact.
+- [x] AC10: Given une écriture qui échoue en base, when des photos neuves ont été écrites, then elles sont supprimées du disque et les anciennes restent.
+- [x] AC11: Given un outil, when il est supprimé (confirmation), then l'outil, ses photos (lignes et fichiers), ses accessoires et ses liens d'étagère disparaissent ; ses étagères et sa marque restent ; retour à la liste avec toast.
+- [x] AC12: Given une étagère d'un autre membre (ou de la bibliothèque) dans `shelf_ids`, then erreur de validation, rien n'est écrit.
+- [x] AC13: Given l'outil d'un autre membre, when un membre ou un admin ouvre la fiche, le formulaire, modifie ou supprime, then 404 et rien ne change (Policy `ToolPolicy`).
+- [x] AC14: Given les routes `garage.tools.*`, then elles sont exposées à Ziggy pour les connectés et absentes pour un invité.
+- [x] AC15: Given F06, when le pipeline d'image est extrait dans un service partagé, then les tests de `BookCoverService` passent inchangés.
+- [x] AC16 (Vitest): liste (cartes, vignette ou image neutre, filtres, états vides), formulaire (marque existante / créée, lignes d'accessoires, photos avec aperçus, ordre et retrait, charge utile envoyée en `POST` + `_method=patch` en modification), fiche (galerie, accessoires, étagères), confirmation de suppression.
+- [x] AC17 (Playwright): connexion, création d'une étagère, puis d'un outil avec une marque créée à la volée, un accessoire, l'étagère et une photo ; l'outil apparaît dans la liste avec sa vignette.
 
 ## Technical approach
 1. **Tables** (migration `2026_11_20_000000_create_tools_tables.php`) :
@@ -48,5 +48,11 @@ Hypothèses : nom de l'outil 255 caractères ; marque 100 ; accessoires 30 ligne
 
 ## Status
 - Branch: feature/F10-outils
-- Tests written: no
-- Tests passing: no
+- Tests written: yes (tests/Feature/Garage/{ToolAccess,ToolIndex,ToolPages,StoreTool,UpdateTool,DestroyTool,BrandService,ToolPhotoService}Test.php, tests/Unit/Garage/ToolPolicyTest.php, GarageRouteListTest ; Vitest pages/Garage/Tools/{Index,Show}.test.ts, components/Garage/ToolForm.test.ts, support/garage/toolFormRows.test.ts, pages/Garage/Shelves/Index.test.ts ; Playwright tests/e2e/tool.spec.ts)
+- Tests passing: yes (Pest, Pint + Larastan, Vitest, ESLint + vue-tsc, build, Playwright en local)
+
+Notes d'implémentation :
+- Les tests de F06 sont inchangés, sauf le helper `photoWithExif()` déplacé de `BookCoverServiceTest.php` vers `tests/Pest.php` pour être partagé (aucune assertion retirée).
+- `ToolShelfIndexTest` et `ToolShelfAccessTest` : redirection de `/garage` ajustée vers `garage.tools.index`.
+- Course sur la marque simulée en faisant manquer la vérification d'existence (sous-classe de `BrandService`) : une insertion concurrente faite dans le même test serait annulée avec le point de sauvegarde.
+- `scripts/prepare-e2e.sh` lance `php artisan storage:link --force` pour que la vignette soit servie en e2e.

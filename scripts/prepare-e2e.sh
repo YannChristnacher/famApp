@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Prepares a self-contained application for the Playwright tests: a dedicated
-# .env.e2e (APP_ENV=e2e, SQLite), a fresh database with the seeded admin and
-# the built assets. The local .env is left untouched.
+# .env.e2e (APP_ENV=e2e, SQLite), a fresh database with the seeded admin, the
+# public/storage link (uploaded tool photos) and the built assets. The local
+# .env is left untouched.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -29,4 +30,5 @@ touch "$database"
 export APP_ENV=e2e
 php artisan key:generate --force
 php artisan migrate:fresh --seed --force
+php artisan storage:link --force
 npm run build
