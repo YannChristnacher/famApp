@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Enums\Role;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -53,6 +54,26 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'password_set_at' => null,
+        ]);
+    }
+
+    /**
+     * A member who has chosen their password (the default state, stated).
+     */
+    public function activated(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'password_set_at' => now(),
+        ]);
+    }
+
+    /**
+     * The last time the member signed in (null: never).
+     */
+    public function loggedInAt(?CarbonInterface $at): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'last_login_at' => $at,
         ]);
     }
 

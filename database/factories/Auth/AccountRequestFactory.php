@@ -4,6 +4,7 @@ namespace Database\Factories\Auth;
 
 use App\Enums\AccountRequestStatus;
 use App\Models\Auth\AccountRequest;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -29,6 +30,19 @@ class AccountRequestFactory extends Factory
     public function approved(): static
     {
         return $this->state(fn (array $attributes) => ['status' => AccountRequestStatus::Approved]);
+    }
+
+    /**
+     * Approved: the account of the member was created from this request.
+     */
+    public function approvedFor(User $user): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => AccountRequestStatus::Approved,
+            'name' => $user->name,
+            'email' => $user->email,
+            'user_id' => $user->id,
+        ]);
     }
 
     public function rejected(): static
