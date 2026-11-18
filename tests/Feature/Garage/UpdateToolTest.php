@@ -171,16 +171,37 @@ it('refuses shelves of another user and changes nothing', function () {
     expect($tool->shelves()->pluck('tool_shelves.id')->all())->toBe([$own->id]);
 });
 
-it('keeps the previous photos and removes the new files when saving the tool fails', function () {
+it('creates no brand and changes nothing when a photo passing the validation cannot be read', function () {
+    $tool = signedInToolWithPhotos();
+
+    patch(route('garage.tools.update', $tool), [
+        'name' => 'Perceuse modifiée',
+        'brand' => 'Festool',
+        'photos' => [
+            ['file' => UploadedFile::fake()->image('new.jpg', 100, 100)],
+            ['file' => truncatedJpeg()],
+        ],
+    ])->assertSessionHasErrors(['photos' => 'Une des photos n’a pas pu être lue.']);
+
+    expect($tool->fresh()?->name)->toBe('Perceuse')
+        ->and($tool->fresh()?->brand?->name)->toBe('Bosch')
+        ->and(Brand::query()->pluck('name')->all())->toBe(['Bosch'])
+        ->and(toolPhotoPaths($tool))->toBe(['tools/a.jpg', 'tools/b.jpg', 'tools/c.jpg'])
+        ->and(Storage::disk('public')->allFiles())->toEqualCanonicalizing(['tools/a.jpg', 'tools/b.jpg', 'tools/c.jpg']);
+});
+
+it('keeps the previous photos, creates no brand and removes the new files when saving the tool fails', function () {
     $tool = signedInToolWithPhotos();
     Tool::saving(fn () => throw new RuntimeException('Database unavailable'));
 
     patch(route('garage.tools.update', $tool), [
         'name' => 'Perceuse modifiée',
+        'brand' => 'Festool',
         'photos' => [keptPhoto($tool, 'b'), ['file' => UploadedFile::fake()->image('new.jpg', 100, 100)]],
     ])->assertServerError();
 
     expect($tool->fresh()?->name)->toBe('Perceuse')
+        ->and(Brand::query()->pluck('name')->all())->toBe(['Bosch'])
         ->and(toolPhotoPaths($tool))->toBe(['tools/a.jpg', 'tools/b.jpg', 'tools/c.jpg'])
         ->and(Storage::disk('public')->allFiles())->toEqualCanonicalizing(['tools/a.jpg', 'tools/b.jpg', 'tools/c.jpg']);
 });

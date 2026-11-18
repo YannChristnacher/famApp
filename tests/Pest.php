@@ -231,3 +231,14 @@ function toolWithPhotos(User $user, array $photos, string $name = 'Perceuse'): T
 
     return $tool;
 }
+
+/**
+ * A truncated JPEG: its header passes the validation (type read from the
+ * content, dimensions), but GD cannot decode it.
+ */
+function truncatedJpeg(): UploadedFile
+{
+    $jpeg = jpegBytes(100, 80);
+
+    return UploadedFile::fake()->createWithContent('tronquee.jpg', substr($jpeg, 0, intdiv(strlen($jpeg), 2)));
+}

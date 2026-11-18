@@ -36,6 +36,37 @@ it('deletes the tool with its photos, accessories and shelf links, keeping shelv
         ->and(Storage::disk('public')->allFiles())->toBe(['tools/kept.jpg']);
 });
 
+it('locks the tool before reading the paths of its photos, in one transaction', function () {
+    $tool = toolWithPhotos(signIn(), ['a']);
+    $queries = [];
+    DB::listen(function ($query) use (&$queries) {
+        // Without identifier quotes: double quotes on SQLite, backticks on MySQL.
+        $queries[] = str_replace(['"', '`'], '', $query->sql);
+    });
+
+    delete(route('garage.tools.destroy', $tool))->assertRedirect();
+
+    $lock = collect($queries)->search(fn (string $sql) => str_starts_with($sql, 'select * from tools where tools.id = ?')
+        && (DB::getDriverName() !== 'mysql' || str_contains($sql, 'for update')));
+    $paths = collect($queries)->search(fn (string $sql) => str_starts_with($sql, 'select path from tool_photos'));
+    expect($lock)->toBeInt()
+        ->and($paths)->toBeInt()
+        ->and($lock)->toBeLessThan($paths);
+});
+
+it('keeps the photos, rows and files, when the tool cannot be deleted', function () {
+    $tool = toolWithPhotos(signIn(), ['a', 'b']);
+    $tool->accessories()->create(['name' => 'Mallette', 'position' => 1]);
+    Tool::deleted(fn () => throw new RuntimeException('Database unavailable'));
+
+    delete(route('garage.tools.destroy', $tool))->assertServerError();
+
+    expect($tool->fresh())->not->toBeNull()
+        ->and(toolPhotoPaths($tool))->toBe(['tools/a.jpg', 'tools/b.jpg'])
+        ->and(toolAccessoryNames($tool))->toBe(['Mallette'])
+        ->and(Storage::disk('public')->allFiles())->toEqualCanonicalizing(['tools/a.jpg', 'tools/b.jpg']);
+});
+
 it('deletes a shelf without deleting its tools', function () {
     $user = signIn();
     $tool = Tool::factory()->for($user)->create();

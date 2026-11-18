@@ -205,12 +205,30 @@ it('refuses an existing photo id at creation, even one of the user', function ()
         ->and(toolPhotoPaths($other))->toBe(['tools/mine.jpg']);
 });
 
-it('removes the stored photos when the tool cannot be saved', function () {
+it('creates no brand and keeps no file when a photo passing the validation cannot be read', function () {
+    signIn();
+
+    post(route('garage.tools.store'), [
+        'name' => 'Perceuse',
+        'brand' => 'Festool',
+        'photos' => [
+            ['file' => UploadedFile::fake()->image('a.jpg', 100, 100)],
+            ['file' => truncatedJpeg()],
+        ],
+    ])->assertSessionHasErrors(['photos' => 'Une des photos n’a pas pu être lue.']);
+
+    expect(Tool::query()->count())->toBe(0)
+        ->and(Brand::query()->count())->toBe(0)
+        ->and(Storage::disk('public')->allFiles())->toBe([]);
+});
+
+it('removes the stored photos and creates no brand when the tool cannot be saved', function () {
     signIn();
     Tool::saving(fn () => throw new RuntimeException('Database unavailable.'));
 
     post(route('garage.tools.store'), [
         'name' => 'Perceuse',
+        'brand' => 'Festool',
         'photos' => [
             ['file' => UploadedFile::fake()->image('a.jpg', 100, 100)],
             ['file' => UploadedFile::fake()->image('b.jpg', 100, 100)],
@@ -219,5 +237,6 @@ it('removes the stored photos when the tool cannot be saved', function () {
 
     expect(Tool::query()->count())->toBe(0)
         ->and(ToolPhoto::query()->count())->toBe(0)
+        ->and(Brand::query()->count())->toBe(0)
         ->and(Storage::disk('public')->allFiles())->toBe([]);
 });

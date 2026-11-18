@@ -26,7 +26,8 @@ class BrandService
     /**
      * The brand matching the typed name, created when none matches; null for
      * an empty name. When a concurrent request creates the same brand between
-     * the check and the insert, its brand is returned.
+     * the check and the insert, its brand is returned. Called inside the
+     * transaction of the tool, so that a new brand is rolled back with it.
      */
     public function resolve(?string $name): ?Brand
     {
@@ -54,7 +55,12 @@ class BrandService
                 throw $exception;
             }
 
-            return Brand::query()->useWritePdo()->where('normalized_name', Brand::normalizeName($name))->firstOrFail();
+            // A locking read sees the row committed by the concurrent request,
+            // which the snapshot of a REPEATABLE READ transaction would hide.
+            return Brand::query()
+                ->where('normalized_name', Brand::normalizeName($name))
+                ->lockForUpdate()
+                ->firstOrFail();
         }
     }
 }

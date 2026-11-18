@@ -16,8 +16,9 @@ use Throwable;
 /**
  * Tools of a member. New photo files are written before the transaction and
  * removed if it fails; the files of removed photos are deleted only once the
- * transaction is committed. The brand is resolved first, outside the
- * transaction: a brand is shared and never deleted.
+ * transaction is committed. The brand is resolved inside the transaction,
+ * after the photos are stored: an unreadable photo or a failed write never
+ * leaves a new brand in the list shared by the family.
  */
 class ToolService
 {
@@ -59,12 +60,11 @@ class ToolService
 
     public function create(User $user, ToolInput $input): Tool
     {
-        $brand = $this->brands->resolve($input->brand);
         $photos = $this->storeNewPhotos($input->photos);
 
-        return $this->withNewPhotos($photos, fn () => DB::transaction(function () use ($user, $input, $brand, $photos) {
+        return $this->withNewPhotos($photos, fn () => DB::transaction(function () use ($user, $input, $photos) {
             $tool = $user->tools()->make(['name' => $input->name]);
-            $this->saveDetails($tool, $input, $brand);
+            $this->saveDetails($tool, $input, $this->brands->resolve($input->brand));
             $this->savePhotos($tool, $photos, collect());
 
             return $tool;
@@ -73,14 +73,12 @@ class ToolService
 
     public function update(Tool $tool, ToolInput $input): Tool
     {
-        $brand = $this->brands->resolve($input->brand);
         $photos = $this->storeNewPhotos($input->photos);
 
-        $removedPaths = $this->withNewPhotos($photos, fn () => DB::transaction(function () use ($tool, $input, $brand, $photos) {
-            // Two saves of the same tool are written one after the other.
-            Tool::query()->whereKey($tool->id)->lockForUpdate()->firstOrFail();
+        $removedPaths = $this->withNewPhotos($photos, fn () => DB::transaction(function () use ($tool, $input, $photos) {
+            $this->lock($tool);
             $tool->fill(['name' => $input->name]);
-            $this->saveDetails($tool, $input, $brand);
+            $this->saveDetails($tool, $input, $this->brands->resolve($input->brand));
 
             return $this->savePhotos($tool, $photos, $tool->photos()->get()->keyBy('id')->toBase());
         }));
@@ -90,11 +88,31 @@ class ToolService
         return $tool;
     }
 
+    /**
+     * The files are deleted once the rows are gone (a failed deletion keeps
+     * them), read under the lock so that a concurrent edition cannot add a
+     * photo whose file would be left behind.
+     */
     public function delete(Tool $tool): void
     {
-        $paths = $tool->photos()->pluck('path')->all();
-        $tool->delete();
+        $paths = DB::transaction(function () use ($tool) {
+            $this->lock($tool);
+            /** @var list<string> $paths */
+            $paths = $tool->photos()->pluck('path')->all();
+            $tool->delete();
+
+            return $paths;
+        });
+
         $this->photos->delete($paths);
+    }
+
+    /**
+     * Two writes of the same tool run one after the other.
+     */
+    private function lock(Tool $tool): void
+    {
+        Tool::query()->whereKey($tool->id)->lockForUpdate()->firstOrFail();
     }
 
     private function saveDetails(Tool $tool, ToolInput $input, ?Brand $brand): void
