@@ -229,3 +229,17 @@ it('loads the page with the same number of queries whatever the number of books 
     $withOne = $countQueries(1);
     expect($countQueries(5))->toBe($withOne);
 });
+
+it('answers 404 for the page of an account that is not activated, until its password is set', function (bool $admin) {
+    $invited = User::factory()->invited()->create(['name' => 'Invité']);
+    Book::factory()->for($invited)->create();
+    actingAs($admin ? User::factory()->admin()->create() : User::factory()->create());
+
+    get(route('family.members.show', $invited))->assertNotFound();
+
+    $invited->forceFill(['password_set_at' => now()])->save();
+
+    get(route('family.members.show', $invited))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('member.id', $invited->id)->has('books', 1));
+})->with(['user' => [false], 'admin' => [true]]);

@@ -11,6 +11,8 @@ use App\Notifications\Auth\ResetPasswordNotification;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -57,6 +59,18 @@ class User extends Authenticatable
     public function hasSetPassword(): bool
     {
         return $this->password_set_at !== null;
+    }
+
+    /**
+     * Accounts in use: the member has chosen a password (an invitation not
+     * used yet, or expired, is not a member of the family yet).
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function activated(Builder $query): void
+    {
+        $query->whereNotNull('password_set_at');
     }
 
     /**

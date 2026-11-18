@@ -11,14 +11,16 @@ use Illuminate\Database\Eloquent\Collection;
 class FamilyService
 {
     /**
-     * Every account (admins included) by name then id, with the numbers of
-     * their books and tools counted in the same query.
+     * Every activated account (admins included; not the pending invitations)
+     * by name then id, with the numbers of their books and tools counted in
+     * the same query.
      *
      * @return Collection<int, User>
      */
     public function members(): Collection
     {
         return User::query()
+            ->activated()
             ->withCount(['books', 'tools'])
             ->orderBy('name')
             ->orderBy('id')

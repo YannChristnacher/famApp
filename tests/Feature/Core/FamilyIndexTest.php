@@ -64,3 +64,21 @@ it('loads the list with the same number of queries whatever the number of member
     $withOneMember = $countQueries(1);
     expect($countQueries(5))->toBe($withOneMember);
 });
+
+it('leaves out the accounts that are not activated until their password is set', function () {
+    $viewer = User::factory()->create(['name' => 'Marie']);
+    $invited = User::factory()->invited()->create(['name' => 'Invité']);
+    Book::factory()->for($invited)->create();
+    actingAs($viewer);
+
+    get(route('family.index'))
+        ->assertInertia(fn (Assert $page) => $page->has('members', 1)->where('members.0.id', $viewer->id));
+
+    $invited->forceFill(['password_set_at' => now()])->save();
+
+    get(route('family.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('members', 2)
+            ->where('members.0.id', $invited->id)
+            ->where('members.0.books_count', 1));
+});

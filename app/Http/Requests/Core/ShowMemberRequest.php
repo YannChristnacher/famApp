@@ -5,6 +5,7 @@ namespace App\Http\Requests\Core;
 use App\Models\Garage\ToolShelf;
 use App\Models\Library\Bookshelf;
 use App\Models\User;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -12,7 +13,7 @@ use Illuminate\Foundation\Http\FormRequest;
  * Optional parameters of the page of a member: `?bookshelf=<id>` and
  * `?shelf=<id>`, one of the bookshelves / tool shelves of that member
  * (anything else answers 404, as on « Mes livres » and « Mes outils »), and
- * `?tab=garage` to open the garage tab.
+ * `?tab=garage` to open the garage tab. The member must be activated.
  */
 class ShowMemberRequest extends FormRequest
 {
@@ -20,9 +21,15 @@ class ShowMemberRequest extends FormRequest
 
     public const TAB_GARAGE = 'garage';
 
-    public function authorize(): bool
+    /**
+     * An account that is not activated (pending invitation) is not a member
+     * of the family yet: its page answers 404.
+     */
+    public function authorize(): Response
     {
-        return $this->user() !== null;
+        return $this->user() !== null && $this->member()->hasSetPassword()
+            ? Response::allow()
+            : Response::denyAsNotFound();
     }
 
     /**
