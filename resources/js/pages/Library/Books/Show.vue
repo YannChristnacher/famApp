@@ -5,16 +5,34 @@ import DashboardLayout from '@/layouts/DashboardLayout.vue'
 import BookCover from '@/components/Library/BookCover.vue'
 import BookDeleteModal from '@/components/Library/BookDeleteModal.vue'
 import type { Book } from '@/types/library'
+import type { Member } from '@/types/family'
 
 const props = defineProps<{
   book: Book
+  /** The member the book belongs to. */
+  owner: Member
+  /** True for the owner only: the page is read-only for the rest of the family. */
+  editable: boolean
 }>()
 
-const breadcrumb = computed(() => [
-  { label: 'Bibliothèque' },
-  { label: 'Mes livres', to: route('library.books.index', undefined, false) },
-  { label: props.book.title },
-])
+const breadcrumb = computed(() => (props.editable
+  ? [
+      { label: 'Bibliothèque' },
+      { label: 'Mes livres', to: route('library.books.index', undefined, false) },
+      { label: props.book.title },
+    ]
+  : [
+      { label: 'La famille', to: route('family.index', undefined, false) },
+      { label: props.owner.name, to: route('family.members.show', { member: props.owner.id }, false) },
+      { label: props.book.title },
+    ]))
+
+/** The list of the books on a bookshelf: « Mes livres » for the owner, the page of the member otherwise. */
+function bookshelfUrl(bookshelf: number): string {
+  return props.editable
+    ? route('library.books.index', { bookshelf }, false)
+    : route('family.members.show', { member: props.owner.id, bookshelf }, false)
+}
 
 const deleteOpen = ref(false)
 </script>
@@ -63,7 +81,7 @@ const deleteOpen = ref(false)
                 <UButton
                   v-for="bookshelf in book.bookshelves"
                   :key="bookshelf.id"
-                  :to="route('library.books.index', { bookshelf: bookshelf.id }, false)"
+                  :to="bookshelfUrl(bookshelf.id)"
                   :label="bookshelf.name"
                   icon="i-lucide-library"
                   color="neutral"
@@ -79,7 +97,18 @@ const deleteOpen = ref(false)
             </div>
           </dl>
 
-          <div class="flex flex-wrap gap-2 pt-2">
+          <p
+            v-if="!editable"
+            class="text-sm text-muted"
+            data-testid="owner"
+          >
+            Dans la bibliothèque de {{ owner.name }}
+          </p>
+
+          <div
+            v-if="editable"
+            class="flex flex-wrap gap-2 pt-2"
+          >
             <UButton
               :to="route('library.books.edit', { book: book.id }, false)"
               icon="i-lucide-pencil"
@@ -100,6 +129,7 @@ const deleteOpen = ref(false)
     </UCard>
 
     <BookDeleteModal
+      v-if="editable"
       v-model:open="deleteOpen"
       :book="book"
     />

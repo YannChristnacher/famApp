@@ -76,6 +76,8 @@ globalThis.Ziggy = {
     'garage.tools.edit': { uri: 'garage/tools/{tool}/edit', methods: ['GET', 'HEAD'], parameters: ['tool'] },
     'garage.tools.update': { uri: 'garage/tools/{tool}', methods: ['PUT', 'PATCH'], parameters: ['tool'] },
     'garage.tools.destroy': { uri: 'garage/tools/{tool}', methods: ['DELETE'], parameters: ['tool'] },
+    'family.index': { uri: 'family', methods: ['GET', 'HEAD'] },
+    'family.members.show': { uri: 'family/{member}', methods: ['GET', 'HEAD'], parameters: ['member'] },
     'admin.account-requests.index': { uri: 'admin/account-requests', methods: ['GET', 'HEAD'] },
     'admin.account-requests.account.create': {
       uri: 'admin/account-requests/{accountRequest}/account',
