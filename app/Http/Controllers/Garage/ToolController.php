@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Garage\ListToolsRequest;
 use App\Http\Requests\Garage\StoreToolRequest;
 use App\Http\Requests\Garage\UpdateToolRequest;
+use App\Http\Resources\Core\MemberResource;
 use App\Http\Resources\Garage\BrandResource;
 use App\Http\Resources\Garage\ToolDetailsResource;
 use App\Http\Resources\Garage\ToolResource;
@@ -22,7 +23,8 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * The tools of the signed-in member ("Mes outils").
+ * The tools of the signed-in member ("Mes outils"); the page of a tool is
+ * readable by the whole family.
  */
 class ToolController extends Controller
 {
@@ -69,12 +71,17 @@ class ToolController extends Controller
         return $this->toTool($tool, 'ajouté');
     }
 
+    /**
+     * Readable by every member (F11); `editable` shows the actions to the owner only.
+     */
     public function show(Tool $tool): Response
     {
         Gate::authorize('view', $tool);
 
         return Inertia::render('Garage/Tools/Show', [
             'tool' => (new ToolDetailsResource($tool->load(self::DETAILS)))->resolve(),
+            'owner' => (new MemberResource($tool->user))->resolve(),
+            'editable' => Gate::allows('update', $tool),
         ]);
     }
 

@@ -12,7 +12,7 @@ function toolUserWithId(int $id, bool $admin = false): User
     return $user;
 }
 
-it('lets only the owner see, change or delete a tool', function (string $ability) {
+it('lets only the owner change or delete a tool', function (string $ability) {
     $tool = Tool::factory()->make(['user_id' => 1]);
     $policy = new ToolPolicy;
 
@@ -25,7 +25,17 @@ it('lets only the owner see, change or delete a tool', function (string $ability
     $deniedToAdmin = $policy->{$ability}(toolUserWithId(3, admin: true), $tool);
     expect($deniedToAdmin->denied())->toBeTrue()
         ->and($deniedToAdmin->status())->toBe(404);
-})->with(['view', 'update', 'delete']);
+})->with(['update', 'delete']);
+
+// F11: every signed-in member reads the tools of the others (read-only).
+it('lets every signed-in user, admins included, view a tool', function () {
+    $tool = Tool::factory()->make(['user_id' => 1]);
+    $policy = new ToolPolicy;
+
+    expect($policy->view(toolUserWithId(1), $tool)->allowed())->toBeTrue()
+        ->and($policy->view(toolUserWithId(2), $tool)->allowed())->toBeTrue()
+        ->and($policy->view(toolUserWithId(3, admin: true), $tool)->allowed())->toBeTrue();
+});
 
 it('is the policy of the tool model', function () {
     expect(Gate::getPolicyFor(Tool::class))->toBeInstanceOf(ToolPolicy::class);

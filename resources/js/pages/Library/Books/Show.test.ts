@@ -15,10 +15,14 @@ const book: Book = {
   bookshelves: [{ id: 4, name: 'Fantasy' }, { id: 2, name: 'Coup de cœur' }],
 }
 
-async function mountPage(shown: Book = book) {
+const owner = { id: testUser.id, name: testUser.name }
+const paul = { id: 2, name: 'Paul' }
+
+/** The page as seen by the owner, unless `editable` is false (another member). */
+async function mountPage(shown: Book = book, editable = true) {
   testPage.props.auth.user = testUser
 
-  return mountWithUi(Show, { props: { book: shown }, attachTo: document.body })
+  return mountWithUi(Show, { props: { book: shown, owner: editable ? owner : paul, editable }, attachTo: document.body })
 }
 
 function bodyButton(text: string): HTMLButtonElement | undefined {
@@ -86,5 +90,36 @@ describe('Library/Books/Show', () => {
     buttons[0]!.click()
 
     await vi.waitFor(() => expect(destroy).toHaveBeenCalledWith('/library/books/7', expect.any(Object)))
+  })
+
+  it('is read-only for another member: owner named, no action, bookshelves on the page of the member', async () => {
+    const wrapper = await mountPage(book, false)
+
+    expect(wrapper.findComponent({ name: 'DashboardLayout' }).props('breadcrumb')).toEqual([
+      { label: 'La famille', to: '/family' },
+      { label: 'Paul', to: '/family/2' },
+      { label: 'Le Hobbit' },
+    ])
+    expect(wrapper.find('[data-testid="owner"]').text()).toBe('Dans la bibliothèque de Paul')
+    expect(wrapper.findAll('[data-testid="book-bookshelf"]').map((link) => link.attributes('href'))).toEqual([
+      '/family/2?bookshelf=4',
+      '/family/2?bookshelf=2',
+    ])
+    expect(wrapper.find('a[href="/library/books/7/edit"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Modifier')
+    expect(wrapper.text()).not.toContain('Supprimer')
+    expect(document.body.textContent).not.toContain('Supprimer le livre')
+  })
+
+  it('shows the actions and the « Mes livres » breadcrumb to the owner', async () => {
+    const wrapper = await mountPage()
+
+    expect(wrapper.findComponent({ name: 'DashboardLayout' }).props('breadcrumb')).toEqual([
+      { label: 'Bibliothèque' },
+      { label: 'Mes livres', to: '/library/books' },
+      { label: 'Le Hobbit' },
+    ])
+    expect(wrapper.find('[data-testid="owner"]').exists()).toBe(false)
+    expect(wrapper.findAll('button').map((button) => button.text())).toContain('Supprimer')
   })
 })

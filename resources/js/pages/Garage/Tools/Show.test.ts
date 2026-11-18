@@ -16,10 +16,14 @@ const tool: ToolDetails = {
   accessories: [{ id: 1, name: 'Mallette' }, { id: 2, name: 'Batterie 18 V' }],
 }
 
-async function mountPage(shown: ToolDetails = tool) {
+const owner = { id: testUser.id, name: testUser.name }
+const paul = { id: 2, name: 'Paul' }
+
+/** The page as seen by the owner, unless `editable` is false (another member). */
+async function mountPage(shown: ToolDetails = tool, editable = true) {
   testPage.props.auth.user = testUser
 
-  return mountWithUi(Show, { props: { tool: shown }, attachTo: document.body })
+  return mountWithUi(Show, { props: { tool: shown, owner: editable ? owner : paul, editable }, attachTo: document.body })
 }
 
 function bodyButton(text: string): HTMLButtonElement | undefined {
@@ -82,5 +86,37 @@ describe('Garage/Tools/Show', () => {
 
     await vi.waitFor(() => expect(document.body.textContent).not.toContain('Supprimer l’outil'))
     expect(destroy).not.toHaveBeenCalled()
+  })
+
+  it('is read-only for another member: owner named, no action, shelves on the page of the member', async () => {
+    const wrapper = await mountPage(tool, false)
+
+    expect(wrapper.findComponent({ name: 'DashboardLayout' }).props('breadcrumb')).toEqual([
+      { label: 'La famille', to: '/family' },
+      { label: 'Paul', to: '/family/2?tab=garage' },
+      { label: 'Perceuse' },
+    ])
+    expect(wrapper.find('[data-testid="owner"]').text()).toBe('Dans le garage de Paul')
+    expect(wrapper.findAll('[data-testid="tool-shelf"]').map((link) => link.attributes('href'))).toEqual([
+      '/family/2?tab=garage&shelf=4',
+      '/family/2?tab=garage&shelf=2',
+    ])
+    expect(wrapper.findAll('[data-testid="tool-accessory"]').map((item) => item.text())).toEqual(['Mallette', 'Batterie 18 V'])
+    expect(wrapper.find('a[href="/garage/tools/7/edit"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Modifier')
+    expect(wrapper.text()).not.toContain('Supprimer')
+    expect(document.body.textContent).not.toContain('Supprimer l’outil')
+  })
+
+  it('shows the actions and the « Mes outils » breadcrumb to the owner', async () => {
+    const wrapper = await mountPage()
+
+    expect(wrapper.findComponent({ name: 'DashboardLayout' }).props('breadcrumb')).toEqual([
+      { label: 'Garage' },
+      { label: 'Mes outils', to: '/garage/tools' },
+      { label: 'Perceuse' },
+    ])
+    expect(wrapper.find('[data-testid="owner"]').exists()).toBe(false)
+    expect(wrapper.find('a[href="/garage/tools/7/edit"]').text()).toContain('Modifier')
   })
 })

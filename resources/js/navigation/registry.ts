@@ -2,6 +2,7 @@ import type { NavigationMenuItem } from '@nuxt/ui'
 import type { NavigationEntry, NavigationResolvers } from './types'
 import { adminNavigation } from './modules/admin'
 import { coreNavigation } from './modules/core'
+import { familyNavigation } from './modules/family'
 import { garageNavigation } from './modules/garage'
 import { libraryNavigation } from './modules/library'
 
@@ -12,6 +13,7 @@ export const navigationRegistry: NavigationEntry[] = [
   ...coreNavigation,
   ...libraryNavigation,
   ...garageNavigation,
+  ...familyNavigation,
   ...adminNavigation,
 ]
 

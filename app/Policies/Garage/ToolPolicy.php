@@ -7,15 +7,15 @@ use App\Models\User;
 use Illuminate\Auth\Access\Response;
 
 /**
- * Only the owner sees and changes a tool here. Anyone else, admins included,
- * gets a 404, so that the garages of other members are not revealed (their
- * read-only view comes with F11, under its own policy).
+ * Every signed-in member, admins included, reads the tools of the family
+ * (F11); only the owner changes or deletes one. Anyone else gets a 404, so
+ * that a write never reveals more than the read-only pages.
  */
 class ToolPolicy
 {
     public function view(User $user, Tool $tool): Response
     {
-        return $this->ownerOnly($user, $tool);
+        return Response::allow();
     }
 
     public function update(User $user, Tool $tool): Response

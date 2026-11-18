@@ -25,6 +25,16 @@ it('lets only the owner change a bookshelf', function (string $ability) {
     expect($policy->{$ability}(userWithId(3, admin: true), $bookshelf)->denied())->toBeTrue();
 })->with(['update', 'delete', 'move']);
 
+// F11: every signed-in member reads the bookshelfs of the others (read-only).
+it('lets every signed-in user, admins included, view a bookshelf', function () {
+    $bookshelf = Bookshelf::factory()->make(['user_id' => 1, 'position' => 1]);
+    $policy = new BookshelfPolicy;
+
+    expect($policy->view(userWithId(1), $bookshelf)->allowed())->toBeTrue()
+        ->and($policy->view(userWithId(2), $bookshelf)->allowed())->toBeTrue()
+        ->and($policy->view(userWithId(3, admin: true), $bookshelf)->allowed())->toBeTrue();
+});
+
 it('is the policy of the bookshelf model', function () {
     expect(Gate::getPolicyFor(Bookshelf::class))->toBeInstanceOf(BookshelfPolicy::class);
 });

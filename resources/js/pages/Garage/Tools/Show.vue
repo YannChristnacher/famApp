@@ -5,16 +5,34 @@ import DashboardLayout from '@/layouts/DashboardLayout.vue'
 import ToolDeleteModal from '@/components/Garage/ToolDeleteModal.vue'
 import ToolThumbnail from '@/components/Garage/ToolThumbnail.vue'
 import type { ToolDetails } from '@/types/garage'
+import type { Member } from '@/types/family'
 
 const props = defineProps<{
   tool: ToolDetails
+  /** The member the tool belongs to. */
+  owner: Member
+  /** True for the owner only: the page is read-only for the rest of the family. */
+  editable: boolean
 }>()
 
-const breadcrumb = computed(() => [
-  { label: 'Garage' },
-  { label: 'Mes outils', to: route('garage.tools.index', undefined, false) },
-  { label: props.tool.name },
-])
+const breadcrumb = computed(() => (props.editable
+  ? [
+      { label: 'Garage' },
+      { label: 'Mes outils', to: route('garage.tools.index', undefined, false) },
+      { label: props.tool.name },
+    ]
+  : [
+      { label: 'La famille', to: route('family.index', undefined, false) },
+      { label: props.owner.name, to: route('family.members.show', { member: props.owner.id, tab: 'garage' }, false) },
+      { label: props.tool.name },
+    ]))
+
+/** The list of the tools on a shelf: « Mes outils » for the owner, the page of the member otherwise. */
+function shelfUrl(shelf: number): string {
+  return props.editable
+    ? route('garage.tools.index', { shelf }, false)
+    : route('family.members.show', { member: props.owner.id, tab: 'garage', shelf }, false)
+}
 
 const deleteOpen = ref(false)
 </script>
@@ -93,7 +111,7 @@ const deleteOpen = ref(false)
                 <UButton
                   v-for="shelf in tool.shelves"
                   :key="shelf.id"
-                  :to="route('garage.tools.index', { shelf: shelf.id }, false)"
+                  :to="shelfUrl(shelf.id)"
                   :label="shelf.name"
                   icon="i-lucide-toolbox"
                   color="neutral"
@@ -109,7 +127,18 @@ const deleteOpen = ref(false)
             </div>
           </dl>
 
-          <div class="flex flex-wrap gap-2 pt-2">
+          <p
+            v-if="!editable"
+            class="text-sm text-muted"
+            data-testid="owner"
+          >
+            Dans le garage de {{ owner.name }}
+          </p>
+
+          <div
+            v-if="editable"
+            class="flex flex-wrap gap-2 pt-2"
+          >
             <UButton
               :to="route('garage.tools.edit', { tool: tool.id }, false)"
               icon="i-lucide-pencil"
@@ -130,6 +159,7 @@ const deleteOpen = ref(false)
     </UCard>
 
     <ToolDeleteModal
+      v-if="editable"
       v-model:open="deleteOpen"
       :tool="tool"
     />

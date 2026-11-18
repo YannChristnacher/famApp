@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Library\ListBooksRequest;
 use App\Http\Requests\Library\StoreBookRequest;
 use App\Http\Requests\Library\UpdateBookRequest;
+use App\Http\Resources\Core\MemberResource;
 use App\Http\Resources\Library\BookResource;
 use App\Http\Resources\Library\BookshelfResource;
 use App\Models\Library\Book;
@@ -20,7 +21,8 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * The books of the signed-in member ("Mes livres").
+ * The books of the signed-in member ("Mes livres"); the page of a book is
+ * readable by the whole family.
  */
 class BookController extends Controller
 {
@@ -67,12 +69,17 @@ class BookController extends Controller
         return $this->toBook($saved, 'ajouté');
     }
 
+    /**
+     * Readable by every member (F11); `editable` shows the actions to the owner only.
+     */
     public function show(Book $book): Response
     {
         Gate::authorize('view', $book);
 
         return Inertia::render('Library/Books/Show', [
             'book' => (new BookResource($book->load('bookshelves')))->resolve(),
+            'owner' => (new MemberResource($book->user))->resolve(),
+            'editable' => Gate::allows('update', $book),
         ]);
     }
 
