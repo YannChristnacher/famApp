@@ -3,23 +3,24 @@ import type { VisitOptions } from '@inertiajs/core'
 import { router } from '@inertiajs/vue3'
 import { mountWithUi } from '@/test/mountWithUi'
 import { testPage, testUser } from '@/test/testPage'
-import type { Book } from '@/types/library'
+import type { BookDetails } from '@/types/library'
 import Show from './Show.vue'
 
-const book: Book = {
+const book: BookDetails = {
   id: 7,
   title: 'Le Hobbit',
   author: 'J. R. R. Tolkien',
   isbn: '207036822X',
   cover_url: '/storage/covers/hobbit.jpg',
   bookshelves: [{ id: 4, name: 'Fantasy' }, { id: 2, name: 'Coup de cœur' }],
+  comment: null,
 }
 
 const owner = { id: testUser.id, name: testUser.name }
 const paul = { id: 2, name: 'Paul' }
 
 /** The page as seen by the owner, unless `editable` is false (another member). */
-async function mountPage(shown: Book = book, editable = true) {
+async function mountPage(shown: BookDetails = book, editable = true) {
   testPage.props.auth.user = testUser
 
   return mountWithUi(Show, { props: { book: shown, owner: editable ? owner : paul, editable }, attachTo: document.body })
@@ -55,6 +56,31 @@ describe('Library/Books/Show', () => {
     expect(wrapper.find('[data-testid="cover-placeholder"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="isbn"]').text()).toBe('Non renseigné')
     expect(wrapper.text()).toContain('Rangé sur aucune étagère')
+  })
+
+  it('shows the comment as plain text, keeping its line breaks', async () => {
+    const wrapper = await mountPage({ ...book, comment: 'Première ligne\nSeconde ligne' }, false)
+    const comment = wrapper.find('[data-testid="book-comment"]')
+
+    expect(comment.element.textContent).toBe('Première ligne\nSeconde ligne')
+    expect(comment.classes()).toContain('whitespace-pre-line')
+    expect(wrapper.text()).toContain('Commentaire')
+  })
+
+  it('shows a comment containing HTML literally', async () => {
+    const wrapper = await mountPage({ ...book, comment: '<b>gras</b><img src="x" onerror="alert(1)">' })
+    const comment = wrapper.find('[data-testid="book-comment"]')
+
+    expect(comment.text()).toBe('<b>gras</b><img src="x" onerror="alert(1)">')
+    expect(comment.find('b').exists()).toBe(false)
+    expect(comment.find('img').exists()).toBe(false)
+  })
+
+  it('hides the comment block without comment', async () => {
+    const wrapper = await mountPage({ ...book, comment: null })
+
+    expect(wrapper.find('[data-testid="book-comment"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Commentaire')
   })
 
   it('asks for a confirmation naming the book before deleting it', async () => {

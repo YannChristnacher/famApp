@@ -125,6 +125,16 @@ const deleteOpen = ref(false)
                 >Rangé sur aucune étagère</span>
               </dd>
             </div>
+            <div v-if="tool.comment">
+              <dt class="font-medium text-highlighted">
+                Commentaire
+              </dt>
+              <dd
+                class="mt-1 whitespace-pre-line break-words text-muted"
+                data-testid="tool-comment"
+                v-text="tool.comment"
+              />
+            </div>
           </dl>
 
           <p

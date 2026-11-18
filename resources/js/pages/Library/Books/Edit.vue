@@ -3,10 +3,10 @@ import { computed } from 'vue'
 import { route } from 'ziggy-js'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
 import BookForm from '@/components/Library/BookForm.vue'
-import type { Book, Bookshelf } from '@/types/library'
+import type { BookDetails, Bookshelf } from '@/types/library'
 
 const props = defineProps<{
-  book: Book
+  book: BookDetails
   /** The bookshelves of the signed-in member, by position. */
   bookshelves: Bookshelf[]
 }>()

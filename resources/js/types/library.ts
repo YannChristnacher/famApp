@@ -34,6 +34,14 @@ export interface Book {
 }
 
 /**
+ * A book with its comment, for its page and its form (BookDetailsResource).
+ */
+export interface BookDetails extends Book {
+  /** Free text of the owner (plain text, line breaks kept), null without comment. */
+  comment: string | null
+}
+
+/**
  * Prefill of the book form found on Google Books (GoogleBooksLookupResource).
  */
 export interface GoogleBooksLookup {

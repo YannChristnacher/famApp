@@ -14,6 +14,7 @@ const tool: ToolDetails = {
   shelves: [{ id: 4, name: 'Établi' }, { id: 2, name: 'Électroportatif' }],
   photos: [{ id: 11, url: '/storage/tools/front.jpg' }, { id: 12, url: '/storage/tools/side.jpg' }],
   accessories: [{ id: 1, name: 'Mallette' }, { id: 2, name: 'Batterie 18 V' }],
+  comment: null,
 }
 
 const owner = { id: testUser.id, name: testUser.name }
@@ -118,5 +119,30 @@ describe('Garage/Tools/Show', () => {
     ])
     expect(wrapper.find('[data-testid="owner"]').exists()).toBe(false)
     expect(wrapper.find('a[href="/garage/tools/7/edit"]').text()).toContain('Modifier')
+  })
+
+  it('shows the comment as plain text, keeping its line breaks', async () => {
+    const wrapper = await mountPage({ ...tool, comment: 'Première ligne\nSeconde ligne' }, false)
+    const comment = wrapper.find('[data-testid="tool-comment"]')
+
+    expect(comment.element.textContent).toBe('Première ligne\nSeconde ligne')
+    expect(comment.classes()).toContain('whitespace-pre-line')
+    expect(wrapper.text()).toContain('Commentaire')
+  })
+
+  it('shows a comment containing HTML literally', async () => {
+    const wrapper = await mountPage({ ...tool, comment: '<b>gras</b><img src="x" onerror="alert(1)">' })
+    const comment = wrapper.find('[data-testid="tool-comment"]')
+
+    expect(comment.text()).toBe('<b>gras</b><img src="x" onerror="alert(1)">')
+    expect(comment.find('b').exists()).toBe(false)
+    expect(comment.find('img').exists()).toBe(false)
+  })
+
+  it('hides the comment block without comment', async () => {
+    const wrapper = await mountPage({ ...tool, comment: null })
+
+    expect(wrapper.find('[data-testid="tool-comment"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Commentaire')
   })
 })

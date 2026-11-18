@@ -19,6 +19,7 @@ const tool: ToolDetails = {
   shelves: [{ id: 9, name: 'Établi' }],
   photos: [{ id: 11, url: '/storage/tools/a.jpg' }, { id: 12, url: '/storage/tools/b.jpg' }],
   accessories: [{ id: 1, name: 'Mallette' }, { id: 2, name: 'Batterie' }],
+  comment: 'Mèche usée',
 }
 
 async function mountForm(props: { tool: ToolDetails | null }) {
@@ -68,6 +69,10 @@ function photoSources(wrapper: FormWrapper): (string | undefined)[] {
 
 function accessoryInputs(wrapper: FormWrapper) {
   return wrapper.findAll('[data-testid="accessory-row"] input')
+}
+
+function commentField(wrapper: FormWrapper) {
+  return wrapper.find('textarea[name="comment"]')
 }
 
 function spyOnPost() {
@@ -130,6 +135,7 @@ describe('Garage/ToolForm', () => {
     expect(postedData(post)).toEqual({
       name: 'Scie plongeante',
       brand: 'Festool',
+      comment: '',
       shelf_ids: [9],
       accessories: ['Lame', 'Rail'],
       photos: [{ file: side }, { file: face }],
@@ -137,6 +143,30 @@ describe('Garage/ToolForm', () => {
     // The files are sent as they are, not as reactive proxies.
     const sent = postedData(post).photos as { file: File }[]
     expect(sent[0]!.file).toBe(side)
+  })
+
+  it('offers an optional comment field with a character counter, sent with the tool', async () => {
+    const post = spyOnPost()
+    const wrapper = await mountForm({ tool: null })
+    const label = wrapper.findAll('label').find((element) => element.text().startsWith('Commentaire'))
+
+    expect(label?.attributes('for')).toBe(commentField(wrapper).attributes('id'))
+    expect(commentField(wrapper).attributes('required')).toBeUndefined()
+    expect(commentField(wrapper).attributes('maxlength')).toBe('2000')
+    expect(wrapper.find('[data-testid="comment-counter"]').text()).toBe('0 / 2000')
+
+    await wrapper.find('input[name="name"]').setValue('Ponceuse')
+    await commentField(wrapper).setValue('Grain 120\nPapier neuf')
+    expect(wrapper.find('[data-testid="comment-counter"]').text()).toBe('21 / 2000')
+    await wrapper.find('form').trigger('submit')
+
+    await vi.waitFor(() => expect(post).toHaveBeenCalled())
+    expect(postedData(post)).toMatchObject({ name: 'Ponceuse', comment: 'Grain 120\nPapier neuf' })
+  })
+
+  it('prefills the comment of an edited tool, empty without comment', async () => {
+    expect((commentField(await mountForm({ tool })).element as HTMLTextAreaElement).value).toBe('Mèche usée')
+    expect((commentField(await mountForm({ tool: { ...tool, comment: null } })).element as HTMLTextAreaElement).value).toBe('')
   })
 
   it('selects an existing brand rather than creating a duplicate differing by case or spaces', async () => {
@@ -163,7 +193,7 @@ describe('Garage/ToolForm', () => {
     await wrapper.find('form').trigger('submit')
 
     await vi.waitFor(() => expect(post).toHaveBeenCalled())
-    expect(postedData(post)).toEqual({ name: 'Ponceuse', brand: 'Bosch', shelf_ids: [], accessories: [], photos: [] })
+    expect(postedData(post)).toEqual({ name: 'Ponceuse', brand: 'Bosch', comment: '', shelf_ids: [], accessories: [], photos: [] })
   })
 
   it('edits a tool: keeps, removes, adds and reorders photos, sent with POST and _method=patch', async () => {
@@ -188,6 +218,7 @@ describe('Garage/ToolForm', () => {
     expect(postedData(post)).toEqual({
       name: 'Perceuse',
       brand: 'Bosch',
+      comment: 'Mèche usée',
       shelf_ids: [9],
       accessories: ['Mallette', 'Batterie'],
       photos: [{ file: added }, { id: 12 }],
