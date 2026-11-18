@@ -26,6 +26,7 @@
 - `app/Http/Resources/Core/MemberResource.php` (`id`, `name`, rien d'autre) ; `FamilyMemberResource` (+ `books_count`, `tools_count`, `own`).
 - `app/Models/User.php` : scope `activated()` (`password_set_at` non nul ; attribut `#[Scope]`), à utiliser pour tout ce qui liste des membres.
 - Front famille : `pages/Core/Family/{Index,Show}.vue` (Show : `UTabs` bibliothèque/garage, `?tab=garage` choisit l'onglet, filtres par étagère qui gardent l'onglet, `BookCard`/`ToolCard` réutilisées, liens « Gérer mes livres/outils » si `own`), `navigation/modules/family.ts` (« La famille », `i-lucide-users`, `family.index`, `requiredRole: 'user'`, après Garage), `types/family.ts`, `support/family/counts.ts` (`countLabel`, `inventoryLabel`, pluriel français : 0 et 1 au singulier).
+- Recherche globale (F12) : contrat `app/Services/Core/Search/SearchSource.php` (`key`, `label`, `icon`, `search(SearchTerm, User, limit)`), `SearchTerm` (terme trimé ; `whereStartsWith`/`whereContains` = `like ? escape '!'`, seul `whereRaw` du projet ; `ranked()` = 2 requêtes bornées : libellé qui commence par, puis autres correspondances), DTO `SearchResult` (`type`, `id`, `label`, `description`, `url` relative, `image`) et `SearchGroup`, `SearchRegistry` (singleton, `register(class)`, `sources()`), `app/Services/Core/GlobalSearchService.php` (`RESULTS_PER_GROUP` 5, groupes vides omis), sources `Library/BookSearchSource` (titre, auteur, ISBN normalisé), `Garage/ToolSearchSource` (nom, marque, accessoires), `Core/MemberSearchSource` (membres activés, nom, nombres) ; `app/Providers/SearchServiceProvider.php` (ordre des groupes). Endpoint `GET /search?q=` (`search`, `throttle:search` 60/min par membre, JSON 429), `Core/SearchController`, `Core/SearchRequest` (2 à 100 caractères), `Core/SearchGroupResource`. Front : `composables/useGlobalSearch.ts` (anti-rebond 250 ms, `AbortController`, messages français), `components/Core/GlobalSearch.vue` (`UDashboardSearch`, groupes `ignoreFilter`, `router.visit(url)`), `types/search.ts`, monté par `DashboardLayout`. Tests : `tests/Feature/Core/{SearchEndpoint,SearchRegistry,SearchRouteList,MemberSearchSource}Test.php`, `tests/Feature/Library/BookSearchSourceTest.php`, `tests/Feature/Garage/ToolSearchSourceTest.php`, `tests/Unit/Core/SearchTermTest.php`, Vitest `useGlobalSearch.test.ts`, `GlobalSearch.test.ts`.
 - `app/Http/Middleware/HandleInertiaRequests.php` : props partagées `auth.user` (`id`, `name`, `email`, `role`, rien d'autre) et `status`.
 - `app/Providers/RateLimitServiceProvider.php` : tous les limiteurs (`login`, `password-reset-link`, `password-reset`, `account-request`, `google-books`) et leur réponse commune ; `google-books` est par membre (`user:<id>`), 10/min, réponse JSON 429.
 - `app/Support/ClientNetwork.php` : clé de limiteur (IPv4 telle quelle, IPv6 groupée par /64, IPv4 encapsulée ramenée à l'IPv4).
@@ -198,6 +199,13 @@
 7. Télécharger un fichier distant : URL vérifiée par une liste d'hôtes exacts (`GoogleBooksCoverPolicy`), redirections suivies à la main (3 max, mêmes règles), taille bornée de trois façons, type lu dans les octets, puis `BookCoverService::store()`. Un échec ne bloque pas l'enregistrement.
 8. Tests : `Http::preventStrayRequests()` + `Http::fake()` dans chaque fichier, clé et en-têtes vérifiés avec `Http::assertSent`.
 
+### Ajouter une source à la recherche globale (F12)
+1. Écrire `app/Services/<Module>/XxxSearchSource.php` qui implémente `App\Services\Core\Search\SearchSource` : `key()` (identifiant du groupe), `label()` (intitulé français), `icon()` (`i-lucide-…`, pour les résultats sans image), `search(SearchTerm $term, User $searcher, int $limit)`.
+2. Dans `search()` : requête Eloquent avec `select` minimal et `with()` des relations affichées, puis `$term->ranked($query, '<colonne libellé>', fn (Builder $any) => …conditions « ou »…, $limit)` ; conditions par `$term->whereContains($any, 'colonne', 'or')` (jamais `whereLike` ni `like` à la main : les jokers ne seraient pas échappés), relations par `orWhereHas`.
+3. Mapper vers `new SearchResult(type, id, label, description, route('…show', $x, false), image)` : données minimales (ni email, ni données brutes, ni chemin de fichier : URL publique seulement) ; respecter ce que le membre a le droit de voir.
+4. Enregistrer la classe dans `SearchServiceProvider::boot()` (l'ordre = ordre des groupes). Rien à changer côté front : intitulé, icône et URL viennent du serveur.
+5. Tests sur le modèle de `BookSearchSourceTest` (champs, casse, jokers, tri, limite, forme du résultat) ; ajuster `SearchRegistryTest` (liste des clés) et la forme attendue dans `SearchEndpointTest` si le terme y correspond.
+
 ### Écrire un test Pest
 - Utiliser `Pest\Laravel\get|post|patch|delete|actingAs` et `signIn()` (pas `$this->get()`).
 - Rendu Inertia : `get(route(...))->assertInertia(...)` ; requête Inertia : passer `inertiaHeaders()` en en-têtes.
@@ -272,6 +280,8 @@
 - Données minimales d'un membre pour les autres : `id` et `name` seulement, jamais d'email ; liste avec nombres de livres et d'outils ; aucun horodatage ni identifiant interne (F11).
 - Page d'un membre : une seule route, onglets côté client (`?tab=garage` au chargement), filtres par étagère seulement (pas de filtre par marque), pas de pagination ; sur sa propre page, même vue en lecture seule + liens vers « Mes livres » / « Mes outils » (F11).
 - Code de consultation dans le module `Core` (il agrège Library et Garage) ; réutilise les services `listFor` et les Resources des modules (F11).
+- Recherche globale (F12) : un seul endpoint qui agrège une source par module (registre) ; 5 résultats par groupe, 2 à 100 caractères, pertinence simple (libellé qui commence par le terme, puis toute autre correspondance, puis libellé et id) ; résultats de tous les membres ; membres activés seulement ; « chez vous » / « Vous » pour le chercheur ; pas d'étagères dans les résultats ; pas de Scout ni de FULLTEXT.
+- Casse et accents de la recherche : MySQL (`utf8mb4_unicode_ci`) ignore casse et accents (« eleve » trouve « Élève ») ; SQLite (tests locaux) ignore seulement la casse ASCII. Le test d'accents ne tourne que sous MySQL (CI) ; les autres tests utilisent de l'ASCII.
 - `route()` du front vient de `ziggy-js` (`skip-route-function`), en URL relative (`false`) (F01).
 - `Fortify` : fonctionnalité `resetPasswords()` uniquement ; routes d'auth écrites dans `routes/web.php` ; `laravel/passkeys` est présent mais inactif (F02).
 - Pas de Playwright hors parcours clés ; `tests/e2e/{login,book,tool}.spec.ts` (connexion F02 ; étagère puis livre F06 ; étagère puis outil F10) ; job CI `e2e`.
@@ -327,6 +337,8 @@
 - Décodages asynchrones (caméra et photo) liés à un jeton de session incrémenté à chaque ouverture/fermeture : une réponse tardive ne doit rien émettre.
 
 ### Ziggy, Inertia, tests
+- `whereLike()` de Laravel n'a pas de clause `ESCAPE` et SQLite n'a pas d'échappement par défaut : passer par `SearchTerm::whereContains()` (`like ? escape '!'`), sinon `%` et `_` saisis deviennent des jokers. Ne pas choisir `\` comme caractère d'échappement (échappement différent selon le moteur).
+- `UDashboardSearch` vide son champ et se ferme à chaque choix ; ses groupes doivent porter `ignoreFilter: true` pour des résultats déjà filtrés par le serveur, sinon Fuse les refiltre côté client.
 - MySQL ne remet pas les auto-incréments à zéro entre les tests (SQLite, si) : ne jamais supposer qu'un id existe ni qu'il est absent, ni que deux ids de tables différentes diffèrent ; créer les lignes voulues et utiliser leurs ids réels (tests de filtre de F11 corrigés en relecture).
 - Test Pest d'une page : Ziggy imprime sa liste une fois par processus PHP ; `tests/TestCase.php` la réinitialise (`BladeRouteGenerator::$generated`, `Ziggy::clearRoutes()`), ne pas retirer.
 - Requête Inertia dans un test sans `X-Inertia-Version` : le contrôle de version renvoie un 409 ; utiliser `inertiaHeaders()`.
