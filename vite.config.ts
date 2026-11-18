@@ -77,6 +77,8 @@ export default defineConfig({
       clientPort: Number(process.env.VITE_HMR_CLIENT_PORT ?? 5173),
     },
     watch: {
+      // Docker Desktop (Windows/macOS) bind mounts may not forward file events: VITE_USE_POLLING=true.
+      usePolling: process.env.VITE_USE_POLLING === 'true',
       ignored: ['**/storage/framework/views/**'],
     },
   },
