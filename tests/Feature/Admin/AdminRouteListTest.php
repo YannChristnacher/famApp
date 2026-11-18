@@ -11,6 +11,9 @@ $adminRoutes = [
     'admin.account-requests.account.create',
     'admin.account-requests.account.store',
     'admin.account-requests.reject',
+    'admin.control',
+    'admin.failed-jobs.retry',
+    'admin.failed-jobs.destroy',
 ];
 
 it('exposes the admin routes and the signed-in routes to an admin', function () use ($adminRoutes) {

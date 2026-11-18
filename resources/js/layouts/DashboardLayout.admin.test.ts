@@ -20,6 +20,23 @@ describe('DashboardLayout admin entry from the real registry', () => {
     )
   })
 
+  it('shows the control page entry to an admin, before the account requests', async () => {
+    testPage.props.auth.user = { ...testUser, role: 'admin' }
+
+    const items = menuItems(await mountLayout())
+    const labels = items.map((item) => item.label)
+    expect(items).toContainEqual(
+      expect.objectContaining({ label: 'Contrôle', to: '/admin/control' }),
+    )
+    expect(labels.indexOf('Contrôle')).toBeLessThan(labels.indexOf('Demandes de compte'))
+  })
+
+  it('hides the control page entry from a regular user', async () => {
+    testPage.props.auth.user = { ...testUser, role: 'user' }
+
+    expect(menuItems(await mountLayout()).map((item) => item.label)).not.toContain('Contrôle')
+  })
+
   it('hides the account requests entry from a regular user', async () => {
     testPage.props.auth.user = { ...testUser, role: 'user' }
 

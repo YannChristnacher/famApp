@@ -50,6 +50,9 @@ return [
         'cover_hosts' => ['books.google.com', 'books.googleusercontent.com'],
         'cover_max_kilobytes' => 2048,
         'cover_timeout' => 5,
+        // Days the journal of the calls (google_books_requests) is kept; older
+        // lines are deleted by the daily model:prune task.
+        'journal_retention_days' => (int) env('GOOGLE_BOOKS_JOURNAL_RETENTION_DAYS', 90),
     ],
 
 ];

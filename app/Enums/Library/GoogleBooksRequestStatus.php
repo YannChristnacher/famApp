@@ -33,4 +33,32 @@ enum GoogleBooksRequestStatus: string
             default => self::ClientError,
         };
     }
+
+    /**
+     * French label, for the admin control page.
+     */
+    public function label(): string
+    {
+        return match ($this) {
+            self::Found => 'Trouvé',
+            self::NotFound => 'Introuvable',
+            self::RateLimited => 'Quota dépassé',
+            self::ClientError => 'Erreur de requête',
+            self::ServerError => 'Erreur de Google',
+            self::Timeout => 'Délai dépassé',
+            self::InvalidResponse => 'Réponse invalide',
+            self::StorageFailed => 'Enregistrement impossible',
+            self::Refused => 'Refusé',
+        };
+    }
+
+    /**
+     * Statuses that are not a failure: the call got an answer.
+     *
+     * @return list<self>
+     */
+    public static function answered(): array
+    {
+        return [self::Found, self::NotFound];
+    }
 }

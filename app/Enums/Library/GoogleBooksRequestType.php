@@ -15,4 +15,16 @@ enum GoogleBooksRequestType: string
 
     /** Download of a cover image. */
     case Cover = 'cover';
+
+    /**
+     * French label, for the admin control page.
+     */
+    public function label(): string
+    {
+        return match ($this) {
+            self::Isbn => 'ISBN',
+            self::Volume => 'Volume',
+            self::Cover => 'Couverture',
+        };
+    }
 }

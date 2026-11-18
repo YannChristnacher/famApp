@@ -6,12 +6,15 @@ use App\Enums\Library\GoogleBooksRequestStatus;
 use App\Enums\Library\GoogleBooksRequestType;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * One call to Google Books, written by GoogleBooksJournal.
+ * One call to Google Books, written by GoogleBooksJournal. Kept for
+ * services.google_books.journal_retention_days, then pruned (model:prune).
  *
  * @property int $id
  * @property int|null $user_id
@@ -27,6 +30,20 @@ use Illuminate\Support\Carbon;
 #[Fillable(['type', 'query', 'status', 'http_status', 'duration_ms'])]
 class GoogleBooksRequest extends Model
 {
+    use MassPrunable;
+
+    /**
+     * Calls older than the retention period.
+     *
+     * @return Builder<static>
+     */
+    public function prunable(): Builder
+    {
+        $retentionDays = config()->integer('services.google_books.journal_retention_days');
+
+        return static::query()->where('created_at', '<', now()->subDays($retentionDays));
+    }
+
     /**
      * @return array<string, string>
      */
