@@ -15,7 +15,8 @@ use Illuminate\Validation\Rules\File;
 
 /**
  * Fields of a tool, shared by the creation and the edition: name, brand typed
- * freely (matched on the shared brands by the server), shelves of the member,
+ * freely (matched on the shared brands by the server), optional comment
+ * (trimmed, null when blank), shelves of the member,
  * accessories (a list of names) and photos: an ordered list whose items are
  * either {file} (a new image) or {id} (a photo to keep, allowed only by the
  * edition, for a photo of the edited tool).
@@ -25,6 +26,8 @@ abstract class ToolRequest extends FormRequest
     public const NAME_MAX_LENGTH = 255;
 
     public const BRAND_MAX_LENGTH = 100;
+
+    public const COMMENT_MAX_LENGTH = 2000;
 
     public const ACCESSORY_MAX_LENGTH = 100;
 
@@ -50,6 +53,7 @@ abstract class ToolRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:'.self::NAME_MAX_LENGTH],
             'brand' => ['nullable', 'string', 'max:'.self::BRAND_MAX_LENGTH],
+            'comment' => ['nullable', 'string', 'max:'.self::COMMENT_MAX_LENGTH],
             'shelf_ids' => ['array'],
             'shelf_ids.*' => [
                 'integer',
@@ -83,8 +87,8 @@ abstract class ToolRequest extends FormRequest
 
     public function toolInput(): ToolInput
     {
-        /** @var array{name: string, brand?: string|null} $validated */
-        $validated = $this->safe()->only(['name', 'brand']);
+        /** @var array{name: string, brand?: string|null, comment?: string|null} $validated */
+        $validated = $this->safe()->only(['name', 'brand', 'comment']);
         /** @var list<string> $accessories */
         $accessories = $this->validated('accessories', []);
         /** @var list<int|string> $shelfIds */
@@ -96,6 +100,7 @@ abstract class ToolRequest extends FormRequest
             shelfIds: array_map(intval(...), $shelfIds),
             accessories: $accessories,
             photos: $this->photos(),
+            comment: $validated['comment'] ?? null,
         );
     }
 
@@ -121,6 +126,11 @@ abstract class ToolRequest extends FormRequest
             if (is_string($this->input($field))) {
                 $this->merge([$field => trim($this->input($field))]);
             }
+        }
+
+        if (is_string($this->input('comment'))) {
+            $comment = trim($this->input('comment'));
+            $this->merge(['comment' => $comment === '' ? null : $comment]);
         }
 
         $accessories = $this->input('accessories');

@@ -17,13 +17,16 @@ use Illuminate\Validation\Rules\File;
 
 /**
  * Fields of a book, shared by the creation and the edition: title, author,
- * optional ISBN (normalized), bookshelves of the member, optional cover image,
+ * optional ISBN (normalized), optional comment (trimmed, null when blank),
+ * bookshelves of the member, optional cover image,
  * and the identifier of the Google Books volume chosen by a lookup (its data is
  * fetched again by the server, never taken from the request).
  */
 abstract class BookRequest extends FormRequest
 {
     public const TEXT_MAX_LENGTH = 255;
+
+    public const COMMENT_MAX_LENGTH = 2000;
 
     public const COVER_MAX_KILOBYTES = ImageUploadRules::MAX_KILOBYTES;
 
@@ -41,6 +44,7 @@ abstract class BookRequest extends FormRequest
             'title' => ['required', 'string', 'max:'.self::TEXT_MAX_LENGTH],
             'author' => ['required', 'string', 'max:'.self::TEXT_MAX_LENGTH],
             'isbn' => ['nullable', 'string', new Isbn],
+            'comment' => ['nullable', 'string', 'max:'.self::COMMENT_MAX_LENGTH],
             'bookshelf_ids' => ['array'],
             'bookshelf_ids.*' => [
                 'integer',
@@ -66,19 +70,20 @@ abstract class BookRequest extends FormRequest
     }
 
     /**
-     * The validated fields of the book itself (title, author, isbn).
+     * The validated fields of the book itself (title, author, isbn, comment).
      *
-     * @return array{title: string, author: string, isbn: string|null}
+     * @return array{title: string, author: string, isbn: string|null, comment: string|null}
      */
     public function bookAttributes(): array
     {
-        /** @var array{title: string, author: string, isbn?: string|null} $validated */
-        $validated = $this->safe()->only(['title', 'author', 'isbn']);
+        /** @var array{title: string, author: string, isbn?: string|null, comment?: string|null} $validated */
+        $validated = $this->safe()->only(['title', 'author', 'isbn', 'comment']);
 
         return [
             'title' => $validated['title'],
             'author' => $validated['author'],
             'isbn' => $validated['isbn'] ?? null,
+            'comment' => $validated['comment'] ?? null,
         ];
     }
 
@@ -131,6 +136,11 @@ abstract class BookRequest extends FormRequest
         if (is_string($this->input('isbn'))) {
             $isbn = Isbn::normalize($this->input('isbn'));
             $this->merge(['isbn' => $isbn === '' ? null : $isbn]);
+        }
+
+        if (is_string($this->input('comment'))) {
+            $comment = trim($this->input('comment'));
+            $this->merge(['comment' => $comment === '' ? null : $comment]);
         }
     }
 }

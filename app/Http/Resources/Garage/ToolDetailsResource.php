@@ -9,8 +9,8 @@ use App\Services\Garage\ToolPhotoService;
 use Illuminate\Http\Request;
 
 /**
- * A tool of the signed-in member with its photos and accessories, in order
- * (page and form of the tool).
+ * A tool with its photos and accessories, in order, and its comment (page
+ * and form of the tool); the lists keep ToolResource.
  *
  * @mixin Tool
  */
@@ -33,6 +33,7 @@ class ToolDetailsResource extends ToolResource
                 ->map(fn (ToolAccessory $accessory) => ['id' => $accessory->id, 'name' => $accessory->name])
                 ->values()
                 ->all(),
+            'comment' => $this->comment,
         ];
     }
 }

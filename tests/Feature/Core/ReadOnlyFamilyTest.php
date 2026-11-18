@@ -98,6 +98,7 @@ it('shows the page of a book of another member with its owner, read-only and wit
                 'isbn' => null,
                 'cover_url' => Storage::disk('public')->url('covers/hobbit.jpg'),
                 'bookshelves' => [['id' => $house['bookshelf']->id, 'name' => 'Fantasy']],
+                'comment' => null,
             ])
             ->where('owner', ['id' => $house['owner']->id, 'name' => 'Paul'])
             ->where('editable', false));
@@ -120,6 +121,7 @@ it('shows the page of a tool of another member with its owner, read-only and wit
                 'shelves' => [['id' => $house['shelf']->id, 'name' => 'Établi']],
                 'photos' => [['id' => $house['tool']->photos()->value('id'), 'url' => Storage::disk('public')->url('tools/drill.jpg')]],
                 'accessories' => [['id' => $house['tool']->accessories()->value('id'), 'name' => 'Mallette']],
+                'comment' => null,
             ])
             ->where('owner', ['id' => $house['owner']->id, 'name' => 'Paul'])
             ->where('editable', false));

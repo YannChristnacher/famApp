@@ -36,6 +36,7 @@ it('renders the page of a book of the user', function () {
                 'isbn' => '207036822X',
                 'cover_url' => null,
                 'bookshelves' => [['id' => $fantasy->id, 'name' => 'Fantasy']],
+                'comment' => null,
             ])
             ->missing('book.google_books_data')
             ->missing('book.user_id'));

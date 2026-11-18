@@ -26,6 +26,7 @@ use Illuminate\Support\Carbon;
  * @property int $user_id
  * @property string $name
  * @property int|null $brand_id
+ * @property string|null $comment Free text of the owner, shown on the page of the tool.
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read User $user
@@ -35,7 +36,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, ToolAccessory> $accessories
  * @property-read ToolPhoto|null $thumbnail
  */
-#[Fillable(['name'])]
+#[Fillable(['name', 'comment'])]
 #[UseFactory(ToolFactory::class)]
 #[UsePolicy(ToolPolicy::class)]
 class Tool extends Model
