@@ -11,8 +11,8 @@ Le but de famApp est que chaque membre montre aux autres ses livres et ses outil
 
 ## Acceptance criteria
 - [x] AC1: Given un invité, when il ouvre `family.index` ou `family.members.show`, then il est redirigé vers la connexion.
-- [x] AC2: Given plusieurs membres avec des livres et des outils, when un membre connecté ouvre « La famille » (`/family`), then il voit tous les membres (lui compris, admins compris) triés par nom puis id, chacun avec `id`, `name`, `books_count`, `tools_count`, `own` (vrai pour lui) ; aucun email ni autre champ ; le nombre de requêtes ne dépend pas du nombre de membres.
-- [x] AC3: Given un autre membre, when on ouvre sa page (`/family/{member}`), then on reçoit `member` (`id`, `name`), `own` (faux), ses étagères de bibliothèque et de garage (par position), ses livres (titre puis id) et ses outils (nom puis id), avec les mêmes champs que « Mes livres » / « Mes outils » ; le nombre de requêtes ne dépend pas du nombre de livres ni d'outils ; un membre inconnu répond 404.
+- [x] AC2: Given plusieurs membres avec des livres et des outils, when un membre connecté ouvre « La famille » (`/family`), then il voit tous les membres activés (lui compris, admins compris ; pas les comptes dont l'invitation n'est pas utilisée) triés par nom puis id, chacun avec `id`, `name`, `books_count`, `tools_count`, `own` (vrai pour lui) ; aucun email ni autre champ ; le nombre de requêtes ne dépend pas du nombre de membres.
+- [x] AC3: Given un autre membre, when on ouvre sa page (`/family/{member}`), then on reçoit `member` (`id`, `name`), `own` (faux), ses étagères de bibliothèque et de garage (par position), ses livres (titre puis id) et ses outils (nom puis id), avec les mêmes champs que « Mes livres » / « Mes outils » ; le nombre de requêtes ne dépend pas du nombre de livres ni d'outils ; un membre inconnu ou un compte non activé répond 404 (il redevient visible une fois son mot de passe défini).
 - [x] AC4: Given la page d'un membre, when on filtre par `?bookshelf=<id>` et/ou `?shelf=<id>`, then seuls ses livres (resp. outils) de cette étagère sont listés ; une étagère d'un autre membre (même celle du visiteur), une étagère de l'autre module, un id inconnu ou non entier répond 404 (même règle que « Mes livres » / « Mes outils »). `?tab=garage` ouvre l'onglet garage, toute autre valeur l'onglet bibliothèque.
 - [x] AC5: Given le livre ou l'outil d'un autre membre, when un membre ou un admin ouvre sa fiche (`show`), then 200 avec la fiche, `owner` (`id`, `name`) et `editable` faux ; pour le propriétaire, `editable` est vrai.
 - [x] AC6: Given le livre, l'outil ou l'étagère d'un autre membre, when un membre ou un admin appelle `edit`, `update`, `destroy` ou `move`, then 404 et rien ne change (inchangé depuis F05/F06/F09/F10, toujours testé route par route).
@@ -47,7 +47,7 @@ Le but de famApp est que chaque membre montre aux autres ses livres et ses outil
 - Tests de menu (`registry.test.ts`, `DashboardLayout.roles.test.ts`) : comptes d'entrées ajustés pour la nouvelle entrée.
 
 ### Hypothèses
-- « La famille » liste **tous** les comptes, y compris les invités qui n'ont pas encore défini leur mot de passe (ils apparaissent avec 0 livre et 0 outil) et les admins (un admin est un membre). Trier par nom puis id.
+- « La famille » liste les comptes **activés** (`password_set_at` non nul, scope `User::activated()`), admins compris (un admin est un membre), triés par nom puis id ; un compte non activé (invitation pas encore utilisée ou expirée) n'y figure pas et sa page répond 404 (décision de l'orchestrateur à la relecture).
 - Le code de la consultation vit dans le module `Core` (il agrège Library et Garage) ; l'entrée de menu a son propre fichier `navigation/modules/family.ts`.
 - Un filtre d'étagère qui n'appartient pas au membre affiché répond 404 (cohérent avec « Mes livres » / « Mes outils » et avec la décision F05 « 404 plutôt que 403 »).
 - L'onglet n'est pas une route : `?tab=garage` le choisit au chargement, les liens de filtre le conservent ; changer d'onglet ne recharge pas la page.
@@ -57,3 +57,7 @@ Le but de famApp est que chaque membre montre aux autres ses livres et ses outil
 - Branch: feature/F11-consultation-famille
 - Tests written: yes (tests/Feature/Core/{FamilyIndex,MemberPage,FamilyRouteList,ReadOnlyFamily}Test.php, tests/Unit/{Library,Garage}/*PolicyTest.php, tests/Feature/{Library/BookAccess,Garage/ToolAccess}Test.php, resources/js/pages/Core/Family/{Index,Show}.test.ts, resources/js/pages/{Library/Books,Garage/Tools}/Show.test.ts, resources/js/support/family/counts.test.ts, resources/js/layouts/DashboardLayout.family.test.ts, registry.test.ts, DashboardLayout.roles.test.ts)
 - Tests passing: yes (composer test, composer lint, npm run test, npm run lint, npm run build en local)
+
+## Relecture (2026-11-18)
+Relecteur indépendant : aucun point bloquant. Corrigé à la demande de l'orchestrateur : les comptes non activés (`password_set_at` nul) n'apparaissent plus dans « La famille » et leur page répond 404 (scope réutilisable `User::activated()`, `ShowMemberRequest::authorize()` en `denyAsNotFound`) ; tests : liste sans l'invité, 404 sur sa page pour un membre et un admin, réapparition une fois le mot de passe défini. Tests de filtre rendus indépendants des identifiants (MySQL ne remet pas les auto-incréments à zéro entre les tests).
+Reporté (noté dans `doc/MEMORY.md`) : les deux onglets de la page membre sont toujours calculés ; charger l'onglet inactif à la demande (`Inertia::optional`) si le volume grandit.
