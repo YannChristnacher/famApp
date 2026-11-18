@@ -134,3 +134,50 @@ it('shares the error entries on the control page', function () {
         ->assertDontSee('stacktrace')
         ->assertDontSee('5f2b9c');
 });
+
+it('returns nothing for an empty file', function () {
+    writeLog('');
+
+    expect(app(ErrorLogReader::class)->latest(10))->toBe([]);
+});
+
+it('replaces invalid UTF-8 so the page can still be rendered', function () {
+    writeLog("[2026-11-18 09:05:00] local.ERROR: Bad bytes \xC3\x28 here []\n");
+    actingAs(User::factory()->admin()->create());
+
+    $message = app(ErrorLogReader::class)->latest(10)[0]->message;
+
+    expect(mb_check_encoding($message, 'UTF-8'))->toBeTrue()
+        ->and($message)->toStartWith('Bad bytes')
+        ->and($message)->toEndWith('here');
+    get(route('admin.control'))->assertOk()->assertInertia(fn (Assert $page) => $page->has('errors', 1));
+});
+
+it('ignores a symbolic link', function () {
+    $outside = storage_path('framework/testing/outside-'.Str::random(8).'.log');
+    file_put_contents($outside, "[2026-11-18 09:05:00] local.ERROR: Outside the log directory []\n");
+    symlink($outside, config()->string('famapp.control.log_directory').'/laravel.log');
+
+    try {
+        expect(app(ErrorLogReader::class)->latest(10))->toBe([]);
+    } finally {
+        unlink($outside);
+    }
+});
+
+it('returns nothing for an unreadable file and keeps the page up', function () {
+    $path = writeLog("[2026-11-18 09:05:00] local.ERROR: Secret error []\n");
+    chmod($path, 0000);
+    actingAs(User::factory()->admin()->create());
+
+    expect(app(ErrorLogReader::class)->latest(10))->toBe([]);
+    get(route('admin.control'))->assertOk()->assertInertia(fn (Assert $page) => $page->has('errors', 0));
+
+    chmod($path, 0644);
+})->skip(fn () => function_exists('posix_geteuid') && posix_geteuid() === 0, 'root can read any file');
+
+it('cuts a context written as a list', function () {
+    writeLog("[2026-11-18 09:05:00] local.ERROR: Import failed [\"paul@example.com\",\"token=abc\"] []\n");
+
+    expect(app(ErrorLogReader::class)->latest(10)[0]->message)->toBe('Import failed');
+});

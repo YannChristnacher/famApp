@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\FailedJobActionRequest;
 use App\Services\Admin\FailedJobService;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -14,7 +15,7 @@ class FailedJobController extends Controller
 {
     public function __construct(private readonly FailedJobService $failedJobs) {}
 
-    public function retry(string $uuid): RedirectResponse
+    public function retry(FailedJobActionRequest $request, string $uuid): RedirectResponse
     {
         abort_unless($this->failedJobs->exists($uuid), 404);
 
@@ -23,7 +24,7 @@ class FailedJobController extends Controller
         return $this->backToControlPage('Le job a été remis dans sa file.');
     }
 
-    public function destroy(string $uuid): RedirectResponse
+    public function destroy(FailedJobActionRequest $request, string $uuid): RedirectResponse
     {
         abort_unless($this->failedJobs->exists($uuid), 404);
 

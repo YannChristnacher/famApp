@@ -2,6 +2,7 @@
 
 namespace App\Services\Admin;
 
+use App\Exceptions\Admin\FailedJobNotRetryableException;
 use App\Support\SecretMasker;
 use App\Support\TruncatedText;
 use Illuminate\Contracts\Console\Kernel as Artisan;
@@ -9,6 +10,7 @@ use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Queue\Failed\FailedJobProviderInterface;
 use Illuminate\Support\Carbon;
+use Throwable;
 
 /**
  * Failed jobs of the queue (table failed_jobs): summary for the admin control
@@ -61,10 +63,27 @@ class FailedJobService
 
     /**
      * Pushes the job back on its queue and removes it from the failed jobs.
+     * A payload that cannot be read again is refused before queue:retry
+     * (which would push "null" and forget the line); any failure of the
+     * command (corrupted or undecryptable command) leaves the line intact.
+     *
+     * @throws FailedJobNotRetryableException
      */
     public function retry(string $uuid): void
     {
-        $this->artisan->call('queue:retry', ['id' => [$uuid]]);
+        $payload = $this->table()->where('uuid', $uuid)->value('payload');
+
+        if (! is_string($payload) || ! is_array(json_decode($payload, true))) {
+            throw new FailedJobNotRetryableException;
+        }
+
+        try {
+            $this->artisan->call('queue:retry', ['id' => [$uuid]]);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            throw new FailedJobNotRetryableException($exception);
+        }
     }
 
     public function forget(string $uuid): void

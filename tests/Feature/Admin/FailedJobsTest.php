@@ -1,9 +1,13 @@
 <?php
 
+use App\Exceptions\Admin\FailedJobNotRetryableException;
+use App\Http\Requests\Admin\FailedJobActionRequest;
 use App\Models\User;
 use App\Notifications\Auth\SetPasswordNotification;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Notifications\SendQueuedNotifications;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -153,4 +157,49 @@ it('answers 404 for a malformed identifier', function () {
 
     post('/admin/failed-jobs/not-a-uuid/retry')->assertNotFound();
     delete('/admin/failed-jobs/not-a-uuid')->assertNotFound();
+});
+
+it('refuses to retry a job whose payload is not JSON and keeps it', function () {
+    Queue::fake();
+    $uuid = insertFailedJob(['payload' => 'not json']);
+    actingAs(User::factory()->admin()->create());
+
+    post(route('admin.failed-jobs.retry', $uuid))
+        ->assertRedirect(route('admin.control'))
+        ->assertInertiaFlash('toast', ['type' => 'error', 'message' => FailedJobNotRetryableException::MESSAGE]);
+
+    expect(DB::table('failed_jobs')->where('uuid', $uuid)->value('payload'))->toBe('not json');
+    Queue::assertNothingPushed();
+});
+
+it('keeps a job whose command cannot be read again and reports why', function (string $command, string $cause) {
+    Queue::fake();
+    Exceptions::fake();
+    $uuid = insertFailedJob();
+    $payload = (string) json_encode([
+        'displayName' => SendQueuedNotifications::class,
+        'job' => 'Illuminate\\Queue\\CallQueuedHandler@call',
+        'data' => ['commandName' => SendQueuedNotifications::class, 'command' => $command],
+    ]);
+    DB::table('failed_jobs')->where('uuid', $uuid)->update(['payload' => $payload]);
+    actingAs(User::factory()->admin()->create());
+
+    post(route('admin.failed-jobs.retry', $uuid))
+        ->assertRedirect(route('admin.control'))
+        ->assertInertiaFlash('toast', ['type' => 'error', 'message' => FailedJobNotRetryableException::MESSAGE]);
+
+    expect(DB::table('failed_jobs')->where('uuid', $uuid)->value('payload'))->toBe($payload);
+    Queue::assertNothingPushed();
+    Exceptions::assertReported($cause);
+})->with([
+    'corrupted serialized command' => ['O:48:"Illuminate\\Notifications\\SendQueuedNotifications":1:{broken', ErrorException::class],
+    'undecryptable command' => ['eyJpdiI6Im5vdCBlbmNyeXB0ZWQifQ==', DecryptException::class],
+]);
+
+it('authorizes the failed job actions for an administrator only', function () {
+    $request = fn (User $user) => FailedJobActionRequest::create('/admin/failed-jobs/x', 'POST')
+        ->setUserResolver(fn () => $user);
+
+    expect($request(User::factory()->admin()->make())->authorize())->toBeTrue()
+        ->and($request(User::factory()->make())->authorize())->toBeFalse();
 });
