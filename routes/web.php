@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Admin\AccountRequestAccountController;
 use App\Http\Controllers\Admin\AccountRequestController as AdminAccountRequestController;
+use App\Http\Controllers\Admin\ControlPanelController;
+use App\Http\Controllers\Admin\FailedJobController;
 use App\Http\Controllers\Auth\AccountRequestController;
 use App\Http\Controllers\Auth\AuthPageController;
 use App\Http\Controllers\Auth\InvitationController;
@@ -107,5 +109,12 @@ Route::middleware(['auth', 'can:admin'])->prefix('admin')->name('admin.')->group
     Route::controller(AccountRequestAccountController::class)->group(function () {
         Route::get('/account-requests/{accountRequest}/account', 'create')->name('account-requests.account.create');
         Route::post('/account-requests/{accountRequest}/account', 'store')->name('account-requests.account.store');
+    });
+
+    Route::get('/control', ControlPanelController::class)->name('control');
+
+    Route::controller(FailedJobController::class)->prefix('failed-jobs')->name('failed-jobs.')->group(function () {
+        Route::post('/{uuid}/retry', 'retry')->whereUuid('uuid')->name('retry');
+        Route::delete('/{uuid}', 'destroy')->whereUuid('uuid')->name('destroy');
     });
 });

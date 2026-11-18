@@ -51,6 +51,9 @@ $adminRoutes = [
     'admin.account-requests.account.create',
     'admin.account-requests.account.store',
     'admin.account-requests.reject',
+    'admin.control',
+    'admin.failed-jobs.retry',
+    'admin.failed-jobs.destroy',
 ];
 
 return [
