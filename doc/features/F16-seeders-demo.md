@@ -10,16 +10,16 @@ Remplir la base locale avec un jeu de données réaliste, en français, qui couv
 - `DatabaseSeeder` garde son rôle (compte admin depuis la config) et n'appelle pas le jeu de démonstration.
 
 ## Acceptance criteria
-- [ ] AC1: Given une base vide (admin de la config renseigné), when on lance `db:seed --class=DemoSeeder`, then on obtient l'admin de la config, 4 membres de démo activés en `@famapp.local` (dont un second admin), 1 invité non activé, des `last_login_at` variés (dont un jamais connecté), 2 demandes de compte en attente, 1 approuvée liée à l'invité, 1 refusée.
-- [ ] AC2: Given le jeu chargé, then chaque membre de démo a des étagères de bibliothèque et de garage aux positions 1..n compactes, et chaque lien livre/outil ↔ étagère relie deux objets du même propriétaire.
-- [ ] AC3: Given le jeu chargé, then il y a 30 livres réels (titre, auteur, ISBN-13 valide selon la règle `Isbn`), dont des doublons d'ISBN entre membres, des livres sur 0, 1 ou plusieurs étagères, des commentaires, et des couvertures JPEG présentes sur le disque `public` (quelques livres sans couverture).
-- [ ] AC4: Given le jeu chargé, then il y a 20 outils réalistes, des marques réelles uniques par `normalized_name` (une marque saisie avec une autre casse est rattachée à la même), des accessoires aux positions 1..n, 0 à 3 photos JPEG présentes sur le disque aux positions 1..n, des commentaires.
-- [ ] AC5: Given le jeu chargé, then le journal `google_books_requests` contient des appels des 7 derniers jours avec au moins 5 statuts différents, et `failed_jobs` contient 2 jobs relançables (payload JSON valide d'un vrai job, sans mot de passe, jeton ni clé).
-- [ ] AC6: Given `Http::preventStrayRequests()`, when le jeu est chargé, then aucun appel HTTP n'est fait.
-- [ ] AC7: Given l'environnement `production`, when on lance le seeder, then il s'arrête avec un message clair et n'écrit rien.
-- [ ] AC8: Given le jeu déjà chargé, when on relance le seeder, then il ne plante pas, ne recrée rien et l'indique.
-- [ ] AC9: Given le jeu chargé, when un compte de démo activé se connecte avec le mot de passe documenté (`password`), then il est authentifié ; l'invité ne peut pas se connecter.
-- [ ] AC10: Given le README, then il documente la commande, les comptes, le mot de passe, `storage:link` et « jamais en production ».
+- [x] AC1: Given une base vide (admin de la config renseigné), when on lance `db:seed --class=DemoSeeder`, then on obtient l'admin de la config, 4 membres de démo activés en `@famapp.local` (dont un second admin), 1 invité non activé, des `last_login_at` variés (dont un jamais connecté), 2 demandes de compte en attente, 1 approuvée liée à l'invité, 1 refusée.
+- [x] AC2: Given le jeu chargé, then chaque membre de démo a des étagères de bibliothèque et de garage aux positions 1..n compactes, et chaque lien livre/outil ↔ étagère relie deux objets du même propriétaire.
+- [x] AC3: Given le jeu chargé, then il y a 30 livres réels (titre, auteur, ISBN-13 valide selon la règle `Isbn`), dont des doublons d'ISBN entre membres, des livres sur 0, 1 ou plusieurs étagères, des commentaires, et des couvertures JPEG présentes sur le disque `public` (quelques livres sans couverture).
+- [x] AC4: Given le jeu chargé, then il y a 20 outils réalistes, des marques réelles uniques par `normalized_name` (une marque saisie avec une autre casse est rattachée à la même), des accessoires aux positions 1..n, 0 à 3 photos JPEG présentes sur le disque aux positions 1..n, des commentaires.
+- [x] AC5: Given le jeu chargé, then le journal `google_books_requests` contient des appels des 7 derniers jours avec au moins 5 statuts différents, et `failed_jobs` contient 2 jobs relançables (payload JSON valide d'un vrai job, sans mot de passe, jeton ni clé).
+- [x] AC6: Given `Http::preventStrayRequests()`, when le jeu est chargé, then aucun appel HTTP n'est fait.
+- [x] AC7: Given l'environnement `production`, when on lance le seeder, then il s'arrête avec un message clair et n'écrit rien.
+- [x] AC8: Given le jeu déjà chargé, when on relance le seeder, then il ne plante pas, ne recrée rien et l'indique.
+- [x] AC9: Given le jeu chargé, when un compte de démo activé se connecte avec le mot de passe documenté (`password`), then il est authentifié ; l'invité ne peut pas se connecter.
+- [x] AC10: Given le README, then il documente la commande, les comptes, le mot de passe, `storage:link` et « jamais en production ».
 
 ## Technical approach
 1. `database/seeders/DemoSeeder.php` : refuse la production (`RuntimeException` au message français), ne fait rien si le compte `camille@famapp.local` existe déjà (message « déjà chargé »), appelle `DatabaseSeeder` si aucun admin n'existe et que `ADMIN_EMAIL` est renseigné (sinon simple avertissement : le second admin de démo suffit), puis appelle dans une transaction les sous-seeders `Demo\DemoAccountsSeeder`, `Demo\DemoLibrarySeeder`, `Demo\DemoGarageSeeder`, `Demo\DemoActivitySeeder`, et affiche le tableau des comptes et le mot de passe.
@@ -33,5 +33,5 @@ Hypothèses : le mot de passe de démo `password` (connu, documenté) est volont
 
 ## Status
 - Branch: feature/F16-seeders-demo
-- Tests written: no
-- Tests passing: no
+- Tests written: yes (tests/Feature/Core/DemoSeederTest.php)
+- Tests passing: yes (composer test, composer lint, npm run test, npm run lint, npm run build)
