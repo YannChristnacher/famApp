@@ -67,6 +67,15 @@ export default defineConfig({
     },
   },
   server: {
+    // In Docker, Vite listens on every interface but must advertise a host the browser can reach:
+    // laravel-vite-plugin writes this URL to public/hot (otherwise it would be http://0.0.0.0:5173).
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: true,
+    hmr: {
+      host: process.env.VITE_HMR_HOST ?? 'localhost',
+      clientPort: Number(process.env.VITE_HMR_CLIENT_PORT ?? 5173),
+    },
     watch: {
       ignored: ['**/storage/framework/views/**'],
     },
