@@ -119,7 +119,11 @@ it('refuses shelves of another user or of the library, and writes nothing', func
 })->with([
     'another user' => fn (User $user) => ToolShelf::factory()->create()->id,
     // Created twice so that its id differs from the id of the tool shelf.
-    'library bookshelf of the user' => fn (User $user) => Bookshelf::factory()->for($user)->count(2)->create()->last()?->id,
+    'library bookshelf of the user' => function (User $user) {
+        Bookshelf::factory()->for($user)->create();
+
+        return Bookshelf::factory()->for($user)->create()->id;
+    },
     'unknown' => fn (User $user) => 999,
 ]);
 

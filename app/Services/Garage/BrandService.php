@@ -38,7 +38,7 @@ class BrandService
         return $this->find($name) ?? $this->create($name);
     }
 
-    private function find(string $name): ?Brand
+    protected function find(string $name): ?Brand
     {
         return Brand::query()->where('normalized_name', Brand::normalizeName($name))->first();
     }

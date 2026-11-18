@@ -2,6 +2,7 @@
 
 use App\Models\Garage\Brand;
 use App\Services\Garage\BrandService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
 it('returns no brand for an empty name', function (?string $name) {
@@ -25,21 +26,44 @@ it('reuses the brand whose normalized name matches', function () {
 });
 
 it('reuses the brand created by a concurrent request between its check and its insert', function () {
-    // The concurrent request inserts "Bosch" right after our check found nothing.
-    Brand::creating(function (Brand $brand) {
-        Brand::flushEventListeners();
-        DB::table('brands')->insert(['name' => 'Bosch', 'normalized_name' => 'bosch', 'created_at' => now(), 'updated_at' => now()]);
-    });
+    Brand::factory()->create(['name' => 'Bosch']);
+    // The check ran before the concurrent request committed "Bosch".
+    $service = new class extends BrandService
+    {
+        protected function find(string $name): ?Brand
+        {
+            return null;
+        }
+    };
 
-    $brand = app(BrandService::class)->resolve('bosch');
+    $brand = $service->resolve('bosch');
 
     expect($brand?->name)->toBe('Bosch')
         ->and(Brand::query()->count())->toBe(1);
+});
+
+it('works inside a transaction: the failed insert does not abort it', function () {
+    Brand::factory()->create(['name' => 'Bosch']);
+    $service = new class extends BrandService
+    {
+        protected function find(string $name): ?Brand
+        {
+            return null;
+        }
+    };
+
+    $names = DB::transaction(function () use ($service) {
+        $service->resolve('BOSCH');
+
+        return Brand::query()->pluck('name')->all();
+    });
+
+    expect($names)->toBe(['Bosch']);
 });
 
 it('enforces the uniqueness of the normalized name in the database', function () {
     Brand::factory()->create(['name' => 'Festool']);
 
     expect(fn () => Brand::factory()->create(['name' => 'festool ']))
-        ->toThrow(Illuminate\Database\UniqueConstraintViolationException::class);
+        ->toThrow(UniqueConstraintViolationException::class);
 });
