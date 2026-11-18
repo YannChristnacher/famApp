@@ -13,6 +13,7 @@ $guestRoutes = [
 $authenticatedRoutes = [
     'home',
     'logout',
+    'search',
     'library.index',
     'library.bookshelves.index',
     'library.bookshelves.store',

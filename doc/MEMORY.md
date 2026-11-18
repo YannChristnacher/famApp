@@ -1,5 +1,5 @@
 # Mémoire partagée famApp
-> À lire avant d'explorer le code. Mise à jour par l'agent scribe à chaque feature. Dernière mise à jour : F11.
+> À lire avant d'explorer le code. Mise à jour par l'agent scribe à chaque feature. Dernière mise à jour : F12.
 
 ## État du projet
 
@@ -13,7 +13,8 @@
 - F09 garage : CRUD et ordre des étagères à outils, extraction de `NormalizedName` et `OrderedPositions` (PR #10) : relue et validée.
 - F10 garage : CRUD des outils (marques partagées, photos multiples, accessoires), extraction du pipeline d'image dans `ResizedJpegStorage` (PR #11) : relue et validée ; le statut final dans le backlog passe à `terminée` au merge (F06 à F09 le sont déjà ou le seront au merge de leur PR).
 - F11 consultation : « La famille » et page d'un membre (bibliothèque et garage des autres en lecture seule), fiches livre/outil lisibles par tous, `view` des Policies ouvert (PR #12) : relue et validée ; le statut final dans le backlog passe à `terminée` au merge.
-- Prochaine : F12 (recherche globale, dépend de F11).
+- F12 recherche globale : palette de l'en-tête (`UDashboardSearch`) alimentée par un endpoint `GET /search` qui agrège une source par module (livres, outils, membres) (PR #13) : relue et validée sans correction ; le statut final dans le backlog passe à `terminée` au merge.
+- Prochaine : F13 (page de contrôle admin, dépend de F12).
 - Suite du backlog : `doc/BACKLOG.md` (source de vérité des statuts).
 
 ## Carte du code par module
@@ -26,8 +27,9 @@
 - `app/Http/Resources/Core/MemberResource.php` (`id`, `name`, rien d'autre) ; `FamilyMemberResource` (+ `books_count`, `tools_count`, `own`).
 - `app/Models/User.php` : scope `activated()` (`password_set_at` non nul ; attribut `#[Scope]`), à utiliser pour tout ce qui liste des membres.
 - Front famille : `pages/Core/Family/{Index,Show}.vue` (Show : `UTabs` bibliothèque/garage, `?tab=garage` choisit l'onglet, filtres par étagère qui gardent l'onglet, `BookCard`/`ToolCard` réutilisées, liens « Gérer mes livres/outils » si `own`), `navigation/modules/family.ts` (« La famille », `i-lucide-users`, `family.index`, `requiredRole: 'user'`, après Garage), `types/family.ts`, `support/family/counts.ts` (`countLabel`, `inventoryLabel`, pluriel français : 0 et 1 au singulier).
+- Recherche globale (F12) : contrat `app/Services/Core/Search/SearchSource.php` (`key`, `label`, `icon`, `search(SearchTerm, User, limit)`), `SearchTerm` (terme trimé ; `whereStartsWith`/`whereContains` = `like ? escape '!'`, seul `whereRaw` du projet ; `ranked()` = 2 requêtes bornées : libellé qui commence par, puis autres correspondances), DTO `SearchResult` (`type`, `id`, `label`, `description`, `url` relative, `image`) et `SearchGroup`, `SearchRegistry` (singleton, `register(class)`, `sources()`), `app/Services/Core/GlobalSearchService.php` (`RESULTS_PER_GROUP` 5, groupes vides omis), sources `Library/BookSearchSource` (titre, auteur, ISBN normalisé), `Garage/ToolSearchSource` (nom, marque, accessoires), `Core/MemberSearchSource` (membres activés, nom, nombres) ; `app/Providers/SearchServiceProvider.php` (ordre des groupes). Endpoint `GET /search?q=` (`search`, `throttle:search` 60/min par membre, JSON 429), `Core/SearchController`, `Core/SearchRequest` (2 à 100 caractères), `Core/SearchGroupResource`. Front : `composables/useGlobalSearch.ts` (anti-rebond 250 ms, `AbortController`, messages français), `components/Core/GlobalSearch.vue` (`UDashboardSearch`, groupes `ignoreFilter`, `router.visit(url)`), `types/search.ts`, monté par `DashboardLayout`. Tests : `tests/Feature/Core/{SearchEndpoint,SearchRegistry,SearchRouteList,MemberSearchSource}Test.php`, `tests/Feature/Library/BookSearchSourceTest.php`, `tests/Feature/Garage/ToolSearchSourceTest.php`, `tests/Unit/Core/SearchTermTest.php`, Vitest `useGlobalSearch.test.ts`, `GlobalSearch.test.ts`.
 - `app/Http/Middleware/HandleInertiaRequests.php` : props partagées `auth.user` (`id`, `name`, `email`, `role`, rien d'autre) et `status`.
-- `app/Providers/RateLimitServiceProvider.php` : tous les limiteurs (`login`, `password-reset-link`, `password-reset`, `account-request`, `google-books`) et leur réponse commune ; `google-books` est par membre (`user:<id>`), 10/min, réponse JSON 429.
+- `app/Providers/RateLimitServiceProvider.php` : tous les limiteurs (`login`, `password-reset-link`, `password-reset`, `account-request`, `google-books`, `search`) et leur réponse commune ; `google-books` (10/min) et `search` (60/min) sont par membre (`user:<id>`), réponse JSON 429.
 - `app/Support/ClientNetwork.php` : clé de limiteur (IPv4 telle quelle, IPv6 groupée par /64, IPv4 encapsulée ramenée à l'IPv4).
 - `app/Support/NormalizedName.php` : `of(string)`, forme de comparaison d'un nom libre (trim, espaces multiples réduits, `mb_strtolower`, accents conservés ; `\s` sans UCP, l'espace insécable n'est pas réduit : ne pas changer, cela rendrait périmés les `normalized_name` stockés). Partagé Library et Garage.
 - `app/Support/OrderedPositions.php` : `swapWithNeighbour(Collection, Model, offset)` (échange avec la voisine, rien aux bornes) et `save(Collection)` (renumérotation 1..n en deux temps sous index unique). Partagé Library et Garage ; l'appelant lit et écrit sous le verrou du propriétaire.
@@ -87,6 +89,7 @@
 - `app/Http/Resources/Library/{BookshelfResource,BookResource}.php` (`BookResource` : `id`, `title`, `author`, `isbn`, `cover_url`, `bookshelves` `{id,name}`) ; factory `BookshelfFactory`.
 - Front : `pages/Library/Books/{Index,Create,Edit,Show}.vue` (Show : props `owner` et `editable`, « Modifier »/« Supprimer » seulement si `editable`, fil d'Ariane La famille › propriétaire pour un autre ; Index : grille de cartes + filtres par étagère), `pages/Library/Bookshelves/Index.vue` (bouton « Mes livres », lien « Voir les livres » par étagère), `components/Library/{BookCard,BookCover,BookForm,BookDeleteModal,BookshelfRenameModal,BookshelfDeleteModal}.vue`, `types/library.ts` (`Bookshelf`, `BookshelfSummary`, `Book`), `navigation/modules/library.ts`.
 - `lang/fr/validation.php` : noms de champs des livres (`attributes`).
+- Recherche (F12) : `app/Services/Library/BookSearchSource.php` (groupe `books`, icône `i-lucide-book` ; titre, auteur, ISBN saisi avec ou sans tirets ; libellé = titre, description = auteur · « chez vous » / « chez <nom> », image = couverture, URL `library.books.show`).
 - Tests : `tests/Feature/Library/*` (`Book{Access,Index,Pages}Test`, `{Store,Update,Destroy}BookTest`, `BookCoverServiceTest`, `BookshelfDeletionKeepsBooksTest`, `BookshelfNameUniquenessTest`, `BookshelfServiceLockTest`, `LibraryRouteListTest`), `tests/Unit/Library/{BookshelfPolicyTest,BookPolicyTest,IsbnTest}.php`, Vitest `pages/Library/Books/{Index,Show}.test.ts`, `components/Library/BookForm.test.ts`, `pages/Library/Bookshelves/Index.test.ts`, `DashboardLayout.library.test.ts`, Playwright `tests/e2e/book.spec.ts`.
 
 #### Library : Google Books (F07)
@@ -121,6 +124,7 @@
 - `app/Http/Controllers/Garage/{GarageController,ToolShelfController,ToolShelfPositionController}.php` : `GET /garage` (`garage.index`) redirige vers `garage.tools.index` (« Mes outils », depuis F10) ; resource `garage.shelves.{index,store,update,destroy}` (paramètre `{shelf}`) + `PATCH /garage/shelves/{shelf}/move` (`garage.shelves.move`). Toutes dans `$authenticatedRoutes` de Ziggy.
 - `app/Http/Resources/Garage/ToolShelfResource.php` : `id`, `name`, `position`.
 - Front : `pages/Garage/Shelves/Index.vue` (« Mon garage », fil d'Ariane Garage › Étagères, bouton « Mes outils », lien « Voir les outils » par étagère, état vide « Votre garage est vide. », monter/descendre bloqués pendant la requête), `components/Garage/{ToolShelfRenameModal,ToolShelfDeleteModal}.vue`, `types/garage.ts` (`ToolShelf`, `ToolShelfMoveDirection`), `navigation/modules/garage.ts` (« Garage », `i-lucide-warehouse`, `garage.index`, `requiredRole: 'user'`, après Bibliothèque).
+- Recherche (F12) : `app/Services/Garage/ToolSearchSource.php` (groupe `tools`, `ToolPhotoService` pour l'image ; nom, marque, accessoires ; URL `garage.tools.show`).
 - Tests : `tests/Feature/Garage/*` (`ToolShelf{Access,Index,NameUniqueness,ServiceLock,Service}Test`, `{Store,Update,Destroy,Move}ToolShelfTest`, `GarageRouteListTest`, `ShelfModulesIsolationTest` : un id d'étagère de l'autre module = 404 des deux côtés), `tests/Unit/Garage/ToolShelfPolicyTest.php`, Vitest `pages/Garage/Shelves/Index.test.ts`, `layouts/DashboardLayout.garage.test.ts`.
 
 #### Garage : outils (F10)
@@ -198,6 +202,13 @@
 7. Télécharger un fichier distant : URL vérifiée par une liste d'hôtes exacts (`GoogleBooksCoverPolicy`), redirections suivies à la main (3 max, mêmes règles), taille bornée de trois façons, type lu dans les octets, puis `BookCoverService::store()`. Un échec ne bloque pas l'enregistrement.
 8. Tests : `Http::preventStrayRequests()` + `Http::fake()` dans chaque fichier, clé et en-têtes vérifiés avec `Http::assertSent`.
 
+### Ajouter une source à la recherche globale (F12)
+1. Écrire `app/Services/<Module>/XxxSearchSource.php` qui implémente `App\Services\Core\Search\SearchSource` : `key()` (identifiant du groupe), `label()` (intitulé français), `icon()` (`i-lucide-…`, pour les résultats sans image), `search(SearchTerm $term, User $searcher, int $limit)`.
+2. Dans `search()` : requête Eloquent avec `select` minimal et `with()` des relations affichées, puis `$term->ranked($query, '<colonne libellé>', fn (Builder $any) => …conditions « ou »…, $limit)` ; conditions par `$term->whereContains($any, 'colonne', 'or')` (jamais `whereLike` ni `like` à la main : les jokers ne seraient pas échappés), relations par `orWhereHas`.
+3. Mapper vers `new SearchResult(type, id, label, description, route('…show', $x, false), image)` : données minimales (ni email, ni données brutes, ni chemin de fichier : URL publique seulement) ; respecter ce que le membre a le droit de voir.
+4. Enregistrer la classe dans `SearchServiceProvider::boot()` (l'ordre = ordre des groupes). Rien à changer côté front : intitulé, icône et URL viennent du serveur.
+5. Tests sur le modèle de `BookSearchSourceTest` (champs, casse, jokers, tri, limite, forme du résultat) ; ajuster `SearchRegistryTest` (liste des clés) et la forme attendue dans `SearchEndpointTest` si le terme y correspond.
+
 ### Écrire un test Pest
 - Utiliser `Pest\Laravel\get|post|patch|delete|actingAs` et `signIn()` (pas `$this->get()`).
 - Rendu Inertia : `get(route(...))->assertInertia(...)` ; requête Inertia : passer `inertiaHeaders()` en en-têtes.
@@ -272,6 +283,8 @@
 - Données minimales d'un membre pour les autres : `id` et `name` seulement, jamais d'email ; liste avec nombres de livres et d'outils ; aucun horodatage ni identifiant interne (F11).
 - Page d'un membre : une seule route, onglets côté client (`?tab=garage` au chargement), filtres par étagère seulement (pas de filtre par marque), pas de pagination ; sur sa propre page, même vue en lecture seule + liens vers « Mes livres » / « Mes outils » (F11).
 - Code de consultation dans le module `Core` (il agrège Library et Garage) ; réutilise les services `listFor` et les Resources des modules (F11).
+- Recherche globale (F12) : un seul endpoint qui agrège une source par module (registre) ; **groupes (clé, intitulé, icône) et URL de chaque résultat fournis par le serveur**, le front n'a rien de propre à un module ; 5 résultats par groupe, 2 à 100 caractères ; « commence par » avant « contient » (libellé qui commence par le terme, puis toute autre correspondance, puis libellé et id) ; résultats de tous les membres ; membres activés seulement ; « chez vous » / « Vous » pour le chercheur ; pas d'étagères dans les résultats ; `LIKE` simple, sans moteur externe (ni Scout ni FULLTEXT).
+- Casse et accents de la recherche : MySQL (`utf8mb4_unicode_ci`) ignore casse et accents (« eleve » trouve « Élève ») ; SQLite (tests locaux) ignore seulement la casse ASCII, **pas les accents**. Le test d'accents ne tourne que sous MySQL (CI) ; les autres tests utilisent de l'ASCII.
 - `route()` du front vient de `ziggy-js` (`skip-route-function`), en URL relative (`false`) (F01).
 - `Fortify` : fonctionnalité `resetPasswords()` uniquement ; routes d'auth écrites dans `routes/web.php` ; `laravel/passkeys` est présent mais inactif (F02).
 - Pas de Playwright hors parcours clés ; `tests/e2e/{login,book,tool}.spec.ts` (connexion F02 ; étagère puis livre F06 ; étagère puis outil F10) ; job CI `e2e`.
@@ -327,6 +340,8 @@
 - Décodages asynchrones (caméra et photo) liés à un jeton de session incrémenté à chaque ouverture/fermeture : une réponse tardive ne doit rien émettre.
 
 ### Ziggy, Inertia, tests
+- Le seul `whereRaw` du projet est dans `SearchTerm` (`<colonne> like ? escape '!'`, valeur liée, `%` `_` `!` échappés). Pour toute recherche texte : réutiliser `SearchTerm::whereContains()` / `whereStartsWith()` / `ranked()`, ne jamais concaténer la saisie dans du SQL ni dans un motif. `whereLike()` de Laravel n'a pas de clause `ESCAPE` (SQLite n'a pas d'échappement par défaut) : `%` et `_` saisis deviendraient des jokers. Ne pas choisir `\` comme échappement (traité différemment selon le moteur).
+- `UDashboardSearch` vide son champ et se ferme à chaque choix ; ses groupes doivent porter `ignoreFilter: true` pour des résultats déjà filtrés par le serveur, sinon Fuse les refiltre côté client.
 - MySQL ne remet pas les auto-incréments à zéro entre les tests (SQLite, si) : ne jamais supposer qu'un id existe ni qu'il est absent, ni que deux ids de tables différentes diffèrent ; créer les lignes voulues et utiliser leurs ids réels (tests de filtre de F11 corrigés en relecture).
 - Test Pest d'une page : Ziggy imprime sa liste une fois par processus PHP ; `tests/TestCase.php` la réinitialise (`BladeRouteGenerator::$generated`, `Ziggy::clearRoutes()`), ne pas retirer.
 - Requête Inertia dans un test sans `X-Inertia-Version` : le contrôle de version renvoie un 409 ; utiliser `inertiaHeaders()`.
@@ -352,11 +367,10 @@
 
 ## Notes pour les features à venir
 
-- F12 : sources de recherche : `books` (titre, auteur, ISBN ; index `user_id`+`title` seulement) et `tools` (nom, marque via `brands.normalized_name`, accessoires ; index `user_id`+`name` seulement).
 - Page membre (F11) : les deux onglets sont toujours calculés ; si le volume grandit, charger l'onglet inactif à la demande (`Inertia::optional`).
-- F12 : la recherche globale lit les données de tous les membres activés : réutiliser `User::activated()`, les Resources sans champ sensible et `view` des Policies ; ne jamais exposer l'email.
-- F12 : chaque module fournit sa source de recherche globale ; `UDashboardSearch` a `:groups="[]"` et un texte « arrive bientôt » dans `DashboardLayout.vue` à remplacer.
 - F13 : la page de contrôle admin ira dans le groupe `admin` de Ziggy (`$adminRoutes`).
+- F12 : `LIKE '%terme%'` ne se sert d'aucun index (seuls `user_id`+`title` / `user_id`+`name` existent) : acceptable pour une famille, à revoir si les volumes grandissent.
+- F13 : page admin : compter aussi les recherches ? non requis (rien n'est journalisé côté recherche).
 - F13 : le journal `google_books_requests` (F07, modèle `App\Models\Library\GoogleBooksRequest`, statuts `GoogleBooksRequestStatus`) grossit sans fin : le purger (`Prunable` + durée de conservation configurable, `model:prune` planifié) ; un index `(status, created_at)` sera probablement utile pour les filtres de la page de contrôle (seul `created_at` est indexé aujourd'hui).
 - F14 : la caméra du scanner (F08) exige HTTPS (sauf `localhost`) ; nginx doit servir `.wasm` en `application/wasm` (sinon repli sans streaming, plus lent) ; configurer `trustProxies` (sinon tous les visiteurs partagent la même IP dans les limiteurs) ; les liens d'invitation signés exigent la bonne config proxy/HTTPS ; masquer `signature` dans les logs Nginx.
 - Les comptes ne peuvent pas être supprimés aujourd'hui ; les étagères se suppriment en cascade avec le compte.

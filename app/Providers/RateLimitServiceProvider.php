@@ -39,6 +39,12 @@ class RateLimitServiceProvider extends ServiceProvider
         RateLimiter::for('google-books', fn (Request $request) => Limit::perMinute(10)
             ->by('user:'.$request->user()?->getAuthIdentifier())
             ->response(fn (): JsonResponse => response()->json(['message' => self::TOO_MANY_LOOKUPS], Response::HTTP_TOO_MANY_REQUESTS)));
+
+        // Global search of the header (JSON, signed-in members): typed with a debounce,
+        // a few requests per word.
+        RateLimiter::for('search', fn (Request $request) => Limit::perMinute(60)
+            ->by('user:'.$request->user()?->getAuthIdentifier())
+            ->response(fn (): JsonResponse => response()->json(['message' => self::TOO_MANY_LOOKUPS], Response::HTTP_TOO_MANY_REQUESTS)));
     }
 
     private function perClient(Limit $limit, Request $request, string $message): Limit

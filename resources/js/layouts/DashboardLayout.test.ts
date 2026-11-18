@@ -70,7 +70,7 @@ describe('DashboardLayout', () => {
     expect(menu().props('items')[0].active).toBe(false)
   })
 
-  it('opens the search palette with a French empty state', async () => {
+  it('opens the global search palette with a French invitation', async () => {
     const wrapper = await mountLayout({ attachTo: document.body })
     const button = wrapper.findComponent({ name: 'DashboardSearchButton' })
     expect(button.exists()).toBe(true)
@@ -79,7 +79,7 @@ describe('DashboardLayout', () => {
 
     await vi.waitFor(() => {
       expect(wrapper.findComponent({ name: 'CommandPalette' }).exists()).toBe(true)
-      expect(document.body.textContent).toContain('La recherche dans les livres et les outils arrive bientôt.')
+      expect(document.body.textContent).toContain('Tapez au moins 2 caractères pour chercher un livre, un outil ou un membre.')
     })
   })
 })

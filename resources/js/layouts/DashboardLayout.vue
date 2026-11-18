@@ -7,6 +7,7 @@ import { filterEntriesByRoles, isActiveUrl, navigationRegistry, toNavigationMenu
 import { useAuth } from '@/composables/useAuth'
 import { useFlashToasts } from '@/composables/useFlashToasts'
 import UserMenu from '@/components/Auth/UserMenu.vue'
+import GlobalSearch from '@/components/Core/GlobalSearch.vue'
 
 defineProps<{
   title: string
@@ -78,15 +79,6 @@ const navigationItems = computed(() =>
       </template>
     </UDashboardPanel>
 
-    <UDashboardSearch
-      :groups="[]"
-      :color-mode="false"
-    >
-      <template #empty>
-        <p class="py-6 text-center text-sm text-muted">
-          La recherche dans les livres et les outils arrive bientôt.
-        </p>
-      </template>
-    </UDashboardSearch>
+    <GlobalSearch />
   </UDashboardGroup>
 </template>

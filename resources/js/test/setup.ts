@@ -30,6 +30,7 @@ globalThis.Ziggy = {
   routes: {
     home: { uri: '/', methods: ['GET', 'HEAD'] },
     logout: { uri: 'logout', methods: ['POST'] },
+    search: { uri: 'search', methods: ['GET', 'HEAD'] },
     login: { uri: 'login', methods: ['GET', 'HEAD'] },
     'login.store': { uri: 'login', methods: ['POST'] },
     'password.request': { uri: 'forgot-password', methods: ['GET', 'HEAD'] },
