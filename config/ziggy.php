@@ -33,6 +33,13 @@ $authenticatedRoutes = [
     'garage.shelves.update',
     'garage.shelves.destroy',
     'garage.shelves.move',
+    'garage.tools.index',
+    'garage.tools.create',
+    'garage.tools.store',
+    'garage.tools.show',
+    'garage.tools.edit',
+    'garage.tools.update',
+    'garage.tools.destroy',
 ];
 
 // Printed only to administrators, on top of the signed-in routes.

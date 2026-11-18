@@ -70,7 +70,7 @@ it('lets a signed-in user reach every garage route on their own tool shelf', fun
         $response->assertRedirect(route($redirect))->assertSessionHasNoErrors();
     }
 })->with([
-    'garage.index' => ['garage.index', 302, 'garage.shelves.index'],
+    'garage.index' => ['garage.index', 302, 'garage.tools.index'],
     'index' => ['index', 200, null],
     'store' => ['store', 302, 'garage.shelves.index'],
     'update' => ['update', 302, 'garage.shelves.index'],

@@ -69,6 +69,13 @@ globalThis.Ziggy = {
     'garage.shelves.update': { uri: 'garage/shelves/{shelf}', methods: ['PUT', 'PATCH'], parameters: ['shelf'] },
     'garage.shelves.destroy': { uri: 'garage/shelves/{shelf}', methods: ['DELETE'], parameters: ['shelf'] },
     'garage.shelves.move': { uri: 'garage/shelves/{shelf}/move', methods: ['PATCH'], parameters: ['shelf'] },
+    'garage.tools.index': { uri: 'garage/tools', methods: ['GET', 'HEAD'] },
+    'garage.tools.create': { uri: 'garage/tools/create', methods: ['GET', 'HEAD'] },
+    'garage.tools.store': { uri: 'garage/tools', methods: ['POST'] },
+    'garage.tools.show': { uri: 'garage/tools/{tool}', methods: ['GET', 'HEAD'], parameters: ['tool'] },
+    'garage.tools.edit': { uri: 'garage/tools/{tool}/edit', methods: ['GET', 'HEAD'], parameters: ['tool'] },
+    'garage.tools.update': { uri: 'garage/tools/{tool}', methods: ['PUT', 'PATCH'], parameters: ['tool'] },
+    'garage.tools.destroy': { uri: 'garage/tools/{tool}', methods: ['DELETE'], parameters: ['tool'] },
     'admin.account-requests.index': { uri: 'admin/account-requests', methods: ['GET', 'HEAD'] },
     'admin.account-requests.account.create': {
       uri: 'admin/account-requests/{accountRequest}/account',

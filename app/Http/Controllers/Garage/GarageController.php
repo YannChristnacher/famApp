@@ -6,13 +6,12 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 
 /**
- * Entry point of the Garage module (sidebar): opens the shelves of the member
- * until their tools exist (F10).
+ * Entry point of the Garage module (sidebar): opens the tools of the member.
  */
 class GarageController extends Controller
 {
     public function __invoke(): RedirectResponse
     {
-        return to_route('garage.shelves.index');
+        return to_route('garage.tools.index');
     }
 }

@@ -17,6 +17,7 @@ declare module 'vue' {
     UBreadcrumb: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/Breadcrumb.vue')['default']
     UButton: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/Button.vue')['default']
     UCard: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/Card.vue')['default']
+    UCarousel: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/Carousel.vue')['default']
     UDashboardGroup: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/DashboardGroup.vue')['default']
     UDashboardNavbar: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/DashboardNavbar.vue')['default']
     UDashboardPanel: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/DashboardPanel.vue')['default']

@@ -1,5 +1,5 @@
 # Mémoire partagée famApp
-> À lire avant d'explorer le code. Mise à jour par l'agent scribe à chaque feature. Dernière mise à jour : F09.
+> À lire avant d'explorer le code. Mise à jour par l'agent scribe à chaque feature. Dernière mise à jour : F10.
 
 ## État du projet
 
@@ -9,11 +9,10 @@
 - F03 demande de compte publique (job, notification admin, limiteur) : terminée.
 - F04 admin : liste des demandes, création du compte, invitation signée 7 jours, toasts flash : terminée.
 - F05 bibliothèque : CRUD et ordre des étagères : terminée.
-- F06 bibliothèque : CRUD des livres en saisie manuelle, couverture uploadée, étagères multiples (PR #7) : relue et validée, CI verte ; le statut final dans le backlog passe à `terminée` au merge.
-- F07 bibliothèque : préremplissage par ISBN via Google Books, données brutes, couverture téléchargée, journal des appels (PR #8) : relue et validée, CI verte ; le statut final dans le backlog passe à `terminée` au merge.
-- F08 bibliothèque : scan du code-barres EAN-13 à la caméra dans `BookForm`, 100 % front, aucun changement serveur (PR #9) : relue et validée ; le statut final dans le backlog passe à `terminée` au merge.
-- F09 garage : CRUD et ordre des étagères à outils, extraction de `NormalizedName` et `OrderedPositions` (PR #10) : relue et validée, CI verte ; le statut final dans le backlog passe à `terminée` au merge.
-- Prochaine : F10 (outils du Garage, dépend de F09).
+- F06 à F08 bibliothèque (livres en saisie manuelle + couverture + étagères multiples, préremplissage Google Books par ISBN, scan EAN-13 à la caméra) : relues et validées (PR #7 à #9).
+- F09 garage : CRUD et ordre des étagères à outils, extraction de `NormalizedName` et `OrderedPositions` (PR #10) : relue et validée.
+- F10 garage : CRUD des outils (marques partagées, photos multiples, accessoires), extraction du pipeline d'image dans `ResizedJpegStorage` (PR #11) : relue et validée ; le statut final dans le backlog passe à `terminée` au merge (F06 à F09 le sont déjà ou le seront au merge de leur PR).
+- Prochaine : F11 (consultation en lecture seule des bibliothèques et garages des autres membres, dépend de F06 et F10).
 - Suite du backlog : `doc/BACKLOG.md` (source de vérité des statuts).
 
 ## Carte du code par module
@@ -25,6 +24,8 @@
 - `app/Support/ClientNetwork.php` : clé de limiteur (IPv4 telle quelle, IPv6 groupée par /64, IPv4 encapsulée ramenée à l'IPv4).
 - `app/Support/NormalizedName.php` : `of(string)`, forme de comparaison d'un nom libre (trim, espaces multiples réduits, `mb_strtolower`, accents conservés ; `\s` sans UCP, l'espace insécable n'est pas réduit : ne pas changer, cela rendrait périmés les `normalized_name` stockés). Partagé Library et Garage.
 - `app/Support/OrderedPositions.php` : `swapWithNeighbour(Collection, Model, offset)` (échange avec la voisine, rien aux bornes) et `save(Collection)` (renumérotation 1..n en deux temps sous index unique). Partagé Library et Garage ; l'appelant lit et écrit sous le verrou du propriétaire.
+- `app/Services/Core/ResizedJpegStorage.php` : pipeline d'image partagé (livres et outils) : `store(UploadedFile, dossier, largeurMax)` (GD, JPEG 85 sur fond blanc, sans EXIF, `<dossier>/<40 car.>.jpg`, disque `public` = constante `DISK`), `delete(?string)`, `url(?string)` ; lève `app/Exceptions/Core/UnreadableImageException.php` si GD ne décode pas (l'appelant la traduit en erreur de validation).
+- `app/Support/ImageUploadRules.php` : `rules()` (JPEG/PNG/WebP lus dans le contenu, 10 Mo, 6000 px de côté par `Rule::dimensions`), constantes `MAX_KILOBYTES`, `MAX_PIXELS_PER_SIDE` ; utilisé par `BookRequest` (`cover`) et `ToolRequest` (`photos.*.file`).
 - `app/Support/ZiggyGroup.php` : groupes Ziggy imprimés selon l'utilisateur (`['guest']`, `['auth']`, `['auth','admin']`).
 - `config/ziggy.php` : liste d'autorisation des routes du front (groupes `guest`, `auth`, `admin` + `only`).
 - `config/famapp.php` : `admin.*` (`ADMIN_NAME|EMAIL|PASSWORD`), `invitation_expire_days` (7).
@@ -35,7 +36,7 @@
 - `composables/useAuth.ts` (`useAuth()`, `rolesOf()` : un admin a `['admin','user']`), `composables/useFlashToasts.ts` (monté par `DashboardLayout`).
 - Types : `resources/js/types/{auth,flash,admin,library,garage}.ts` ; `global.d.ts` typé `Ziggy`, `sharedPageProps`, `flashDataType`.
 - `resources/views/vendor/{notifications,mail}/...` : gabarits d'email en français (tous les emails).
-- Tests : `tests/Feature/Core/{HomeTest,LocaleTest}.php`, `tests/Unit/Core/{ClientNetwork,NormalizedName}Test.php`.
+- Tests : `tests/Feature/Core/{HomeTest,LocaleTest}.php`, `tests/Unit/Core/{ClientNetwork,NormalizedName}Test.php` ; les tests du pipeline d'image sont ceux de `BookCoverServiceTest` (inchangés) et de `ToolPhotoServiceTest`.
 
 ### Auth
 - `app/Enums/Role.php` (`Admin`, `User`, `assignableValues()`), `app/Models/User.php` (`isAdmin()`, `hasSetPassword()`, `bookshelves()`, rôle non assignable en masse).
@@ -75,7 +76,7 @@
 - `app/Policies/Library/{BookshelfPolicy,BookPolicy}.php` : `update`, `delete`, `move` (étagère) ; `view`, `update`, `delete` (livre) ; propriétaire seulement, sinon `Response::denyAsNotFound()`.
 - `app/Services/Library/BookshelfService.php` : `listFor`, `create`, `rename`, `delete`, `move` ; chaque écriture verrouille d'abord la ligne `users` du propriétaire (`writingFor`), renumérotation par `OrderedPositions` (`swapWithNeighbour`, `save`).
 - `app/Services/Library/BookService.php` : `listFor(User, ?Bookshelf)` (`with('bookshelves')`, tri titre puis id), `create`, `update`, `delete` ; `withNewCover()` nettoie le fichier neuf si la transaction échoue.
-- `app/Services/Library/BookCoverService.php` : `store(UploadedFile)`, `delete(?string)`, `url(?string)` ; constantes `DISK` (`public`), `DIRECTORY` (`covers`), `MAX_WIDTH` (800).
+- `app/Services/Library/BookCoverService.php` : façade de `ResizedJpegStorage` pour les couvertures : `store(UploadedFile)` (traduit `UnreadableImageException` en erreur `cover`), `delete(?string)`, `url(?string)` ; constantes `DISK`, `DIRECTORY` (`covers`), `MAX_WIDTH` (800).
 - `app/Http/Resources/Library/{BookshelfResource,BookResource}.php` (`BookResource` : `id`, `title`, `author`, `isbn`, `cover_url`, `bookshelves` `{id,name}`) ; factory `BookshelfFactory`.
 - Front : `pages/Library/Books/{Index,Create,Edit,Show}.vue` (Index : grille de cartes + filtres par étagère), `pages/Library/Bookshelves/Index.vue` (bouton « Mes livres », lien « Voir les livres » par étagère), `components/Library/{BookCard,BookCover,BookForm,BookDeleteModal,BookshelfRenameModal,BookshelfDeleteModal}.vue`, `types/library.ts` (`Bookshelf`, `BookshelfSummary`, `Book`), `navigation/modules/library.ts`.
 - `lang/fr/validation.php` : noms de champs des livres (`attributes`).
@@ -110,14 +111,24 @@
 - `app/Policies/Garage/ToolShelfPolicy.php` : `update`, `delete`, `move` ; propriétaire seulement, sinon `Response::denyAsNotFound()`.
 - `app/Rules/Garage/UniqueToolShelfName.php` (compare `normalized_name`, parmi les étagères du garage seulement) ; `app/Enums/Garage/ToolShelfMoveDirection.php` (`offset()`).
 - `app/Http/Requests/Garage/{ToolShelfNameRequest (abstraite),StoreToolShelfRequest,UpdateToolShelfRequest,MoveToolShelfRequest}.php` (`Gate::inspect` dans `authorize()` pour update et move).
-- `app/Http/Controllers/Garage/{GarageController,ToolShelfController,ToolShelfPositionController}.php` : `GET /garage` (`garage.index`) redirige vers `garage.shelves.index` (`/garage/shelves`) ; resource `garage.shelves.{index,store,update,destroy}` (paramètre `{shelf}`) + `PATCH /garage/shelves/{shelf}/move` (`garage.shelves.move`). Toutes dans `$authenticatedRoutes` de Ziggy.
+- `app/Http/Controllers/Garage/{GarageController,ToolShelfController,ToolShelfPositionController}.php` : `GET /garage` (`garage.index`) redirige vers `garage.tools.index` (« Mes outils », depuis F10) ; resource `garage.shelves.{index,store,update,destroy}` (paramètre `{shelf}`) + `PATCH /garage/shelves/{shelf}/move` (`garage.shelves.move`). Toutes dans `$authenticatedRoutes` de Ziggy.
 - `app/Http/Resources/Garage/ToolShelfResource.php` : `id`, `name`, `position`.
-- Front : `pages/Garage/Shelves/Index.vue` (« Mon garage », fil d'Ariane Garage › Étagères, état vide « Votre garage est vide. », monter/descendre bloqués pendant la requête), `components/Garage/{ToolShelfRenameModal,ToolShelfDeleteModal}.vue`, `types/garage.ts` (`ToolShelf`, `ToolShelfMoveDirection`), `navigation/modules/garage.ts` (« Garage », `i-lucide-warehouse`, `garage.index`, `requiredRole: 'user'`, après Bibliothèque).
+- Front : `pages/Garage/Shelves/Index.vue` (« Mon garage », fil d'Ariane Garage › Étagères, bouton « Mes outils », lien « Voir les outils » par étagère, état vide « Votre garage est vide. », monter/descendre bloqués pendant la requête), `components/Garage/{ToolShelfRenameModal,ToolShelfDeleteModal}.vue`, `types/garage.ts` (`ToolShelf`, `ToolShelfMoveDirection`), `navigation/modules/garage.ts` (« Garage », `i-lucide-warehouse`, `garage.index`, `requiredRole: 'user'`, après Bibliothèque).
 - Tests : `tests/Feature/Garage/*` (`ToolShelf{Access,Index,NameUniqueness,ServiceLock,Service}Test`, `{Store,Update,Destroy,Move}ToolShelfTest`, `GarageRouteListTest`, `ShelfModulesIsolationTest` : un id d'étagère de l'autre module = 404 des deux côtés), `tests/Unit/Garage/ToolShelfPolicyTest.php`, Vitest `pages/Garage/Shelves/Index.test.ts`, `layouts/DashboardLayout.garage.test.ts`.
-- Pas de Playwright au Garage avant F10 (parcours « ajout outil »).
+
+#### Garage : outils (F10)
+- `brands` (partagée par toute la famille, jamais supprimée) : `id`, `name` (100, casse du premier qui l'a saisie), `normalized_name` (100, unique, `utf8mb4_bin` sous MySQL). `tools` : `id`, `user_id` (FK cascade), `name` (255), `brand_id` (FK nulle, `restrictOnDelete`), index `user_id`+`name`. `tool_tool_shelf` : `tool_id`, `tool_shelf_id` (FK cascade des deux côtés, clé primaire composite) ; supprimer une étagère ou un outil ne retire que les liens. `tool_photos` : `tool_id` (cascade), `path`, `position` (1..n). `tool_accessories` : `tool_id` (cascade), `name` (100), `position` (1..n). Migration `database/migrations/2026_11_20_000000_create_tools_tables.php`. La cascade SQL ne supprime pas les fichiers des photos.
+- `app/Models/Garage/{Tool,Brand,ToolPhoto,ToolAccessory}.php` : `Tool` `#[Fillable(['name'])]` (ni `user_id` ni `brand_id`), `#[UsePolicy]`, `#[UseFactory]`, `brand()`, `shelves()` (par position), `photos()` et `accessories()` (par position), `thumbnail()` = `hasOne()->oldestOfMany('position')` (une requête en chargement anticipé), `isOwnedBy()` ; `Brand::normalizeName()` + mutateur de `name` ; `ToolShelf::tools()`, `User::tools()`. Fabriques `database/factories/Garage/{Tool,Brand}Factory.php`.
+- `app/Services/Garage/ToolService.php` : `listFor(User, ?ToolShelf, ?Brand)` (`brand`, `shelves`, `thumbnail` ; tri nom puis id), `brandsOf(User)` (marques de ses outils, pour le filtre), `create`, `update`, `delete`. `ToolInput` (readonly : `name`, `brand`, `shelfIds`, `accessories`, `photos` = ids à garder ou fichiers neufs, dans l'ordre).
+- `app/Services/Garage/BrandService.php` : `all()` (choix du formulaire), `resolve(?string)` (marque existante par `normalized_name`, sinon créée ; `null` si vide ; course d'unicité rattrapée, voir pièges). `ToolPhotoService` : façade de `ResizedJpegStorage` (`DIRECTORY` `tools`, `MAX_WIDTH` 1200 ; `store`, `delete(iterable)`, `url`).
+- `app/Http/Requests/Garage/ToolRequest.php` (abstraite : champs partagés, trim, `toolInput()`, constantes `MAX_PHOTOS` 8, `MAX_ACCESSORIES` 30, longueurs ; `keptPhotoRules()` abstraite), `StoreToolRequest` (`photos.*.id` interdit), `UpdateToolRequest` (`Gate::inspect('update')` dans `authorize()`, `photos.*.id` = photo de cet outil), `ListToolsRequest` (`shelfFilter()`, `brandFilter()` : inconnu, non entier, étagère d'un autre ou marque sans outil du membre = 404).
+- `app/Policies/Garage/ToolPolicy.php` : `view`, `update`, `delete` ; propriétaire seulement, sinon `denyAsNotFound()`.
+- `app/Http/Controllers/Garage/ToolController.php` : resource complète `garage.tools.*` (paramètre `{tool}`), toast puis fiche après création/modification, liste après suppression ; routes dans `$authenticatedRoutes` de Ziggy. Resources `ToolResource` (`id`, `name`, `brand`, `thumbnail_url`, `shelves`), `ToolDetailsResource` (+ `photos` `{id,url}`, `accessories` `{id,name}`), `BrandResource`.
+- Front : `pages/Garage/Tools/{Index,Create,Edit,Show}.vue` (Index : cartes + filtres étagère/marque), `components/Garage/{ToolCard,ToolThumbnail,ToolForm,ToolPhotosField,ToolAccessoriesField,ToolDeleteModal}.vue`, `support/garage/toolFormRows.ts` (lignes de photos/accessoires du formulaire), types `Tool`, `ToolDetails`, `Brand`, `ToolFilters`… dans `types/garage.ts`. Marque : `USelectMenu` avec `create-item`. Modification : `POST` + `_method=patch`. `data-testid` : `brand-select`, `shelf-select`, `accessory-add`, `photo-row`, `tool`, `tool-brand`.
+- Tests : `tests/Feature/Garage/{ToolAccess,ToolIndex,ToolPages,StoreTool,UpdateTool,DestroyTool,BrandService,ToolPhotoService}Test.php`, `tests/Unit/Garage/ToolPolicyTest.php`, Vitest `pages/Garage/Tools/{Index,Show}.test.ts`, `components/Garage/ToolForm.test.ts`, `support/garage/toolFormRows.test.ts`, Playwright `tests/e2e/tool.spec.ts` (étagère, puis outil avec marque créée, accessoire, étagère, photo ; vignette réellement servie). Helpers `tests/Pest.php` : `photoWithExif()`, `truncatedJpeg()`, `toolWithPhotos()`, `toolPhotoPaths()`, `toolAccessoryNames()`.
 
 ### Fichiers de test partagés
-- `tests/Pest.php` : `inertiaHeaders()`, `bookshelfNames(User)` et `toolShelfNames(User)` (vérifient aussi les positions 1..n), `signIn()`, `transparentPng(w, h)`, `jpegBytes(w, h)`, `storedImage($path)` (largeur, hauteur, MIME d'une image du disque `public`), `googleVolume()` / `googleSearch()` (réponses Google factices) ; `RefreshDatabase` sur `Feature`.
+- `tests/Pest.php` : `inertiaHeaders()`, `bookshelfNames(User)` et `toolShelfNames(User)` (vérifient aussi les positions 1..n), `signIn()`, `transparentPng(w, h)`, `jpegBytes(w, h)`, `storedImage($path)` (largeur, hauteur, MIME d'une image du disque `public`), `photoWithExif()`, `truncatedJpeg()`, `toolWithPhotos()`, `toolPhotoPaths()`, `toolAccessoryNames()`, `googleVolume()` / `googleSearch()` (réponses Google factices) ; `RefreshDatabase` sur `Feature`.
 - `tests/TestCase.php` : `withoutVite()` + remise à zéro de Ziggy avant chaque test.
 - `resources/js/test/{mountWithUi,setup,testPage}.ts` : voir recettes.
 
@@ -177,7 +188,7 @@
 - Utiliser `Pest\Laravel\get|post|patch|delete|actingAs` et `signIn()` (pas `$this->get()`).
 - Rendu Inertia : `get(route(...))->assertInertia(...)` ; requête Inertia : passer `inertiaHeaders()` en en-têtes.
 - Positions d'étagères : `bookshelfNames($user)`, `toolShelfNames($user)`. Mails : `Notification::fake()` ; files : `Queue::fake()` ; temps : `freezeTime()`.
-- Fabriques : `User::factory()->admin()`, `->invited()`, `Bookshelf::factory()->for($user)`, `ToolShelf::factory()->for($user)`, `Book::factory()->for($user)` (`->withCover()`), `AccountRequest::factory()->approved()`.
+- Fabriques : `User::factory()->admin()`, `->invited()`, `Bookshelf::factory()->for($user)`, `ToolShelf::factory()->for($user)`, `Book::factory()->for($user)` (`->withCover()`), `Tool::factory()->for($user)`, `Brand::factory()`, `AccountRequest::factory()->approved()`.
 
 ### Écrire un test Vitest
 - Monter avec `mountWithUi(Composant, { props, attachTo: document.body })` (renvoie le wrapper du composant testé).
@@ -191,12 +202,14 @@
 - Form Request dans `app/Http/Requests/<Module>/`, `prepareForValidation()` pour trim ; noms de champs français dans `lang/fr/validation.php` (`attributes`).
 - Modèle de modale : `components/Library/BookshelfRenameModal.vue` (`v-model:open`, prop nullable, `watch` pour préremplir).
 
-### Uploader une image (F06)
-- Validation : `File::image()->types([...])->max(Ko)` + `Rule::dimensions()->maxWidth/maxHeight` (borne la mémoire de GD) ; modèle `BookRequest`.
-- Stockage : `BookCoverService` (GD natif, réduction à 800 px de large sans agrandir, orientation EXIF appliquée après réduction mais prise en compte pour la largeur cible (largeur après rotation), décodage selon le type MIME (`imagecreatefromjpeg|png|webp`), réencodage JPEG sur fond blanc donc sans aucun EXIF, nom aléatoire `covers/<40 car.>.jpg`, disque `public`). Fichier écrit avant la transaction, supprimé si elle échoue ; l'ancien fichier supprimé après (`BookService::withNewCover`).
-- Affichage : `BookResource` → `cover_url` ; en local, `php artisan storage:link` est nécessaire (l'image prod le fait). Sans couverture, `BookCover.vue` montre un bloc `UIcon` `i-lucide-book`.
-- Front : `UFileUpload` (`v-model` `File | null`, aperçu intégré) dans un `useForm` : Inertia passe en FormData tout seul ; une modification avec fichier part en `form.transform(d => ({ ...d, _method: 'patch' })).post(...)` (PHP ne lit pas le multipart en PATCH).
-- Tests : `Storage::fake('public')`, `UploadedFile::fake()->image()`, helpers `storedImage()` et `transparentPng()` de `tests/Pest.php` ; Vitest : définir `URL.createObjectURL` (absent de jsdom) pour l'aperçu.
+### Uploader une image (F06, F10)
+- Validation : `ImageUploadRules::rules()` (`app/Support/ImageUploadRules.php` : `File::image()->types([...])->max(Ko)` + `Rule::dimensions()` 6000 px, qui borne la mémoire de GD) ; modèles `BookRequest` (`cover`) et `ToolRequest` (`photos.*.file`). Pour un champ nullable : `['nullable', ...ImageUploadRules::rules()]`.
+- Stockage : `ResizedJpegStorage::store($file, '<dossier>', <largeurMax>)` (`app/Services/Core/`) : GD natif, réduction sans agrandir **avant** la rotation EXIF (largeur cible = largeur après rotation), décodage selon le type MIME lu, JPEG sur fond blanc donc sans EXIF, nom aléatoire, disque `public`. Ne pas le réécrire : créer une façade par module qui traduit `UnreadableImageException` en `ValidationException` sur son champ (modèles `BookCoverService` : `covers`, 800 px ; `ToolPhotoService` : `tools`, 1200 px).
+- Cycle de vie : fichier écrit avant la transaction, supprimé si elle échoue ; ancien fichier supprimé après le commit (`BookService::withNewCover`, `ToolService::withNewPhotos`). La cascade SQL ne supprime pas les fichiers.
+- Affichage : `cover_url` / `thumbnail_url` / `photos[].url` via les Resources ; en local, `php artisan storage:link` est nécessaire (l'image prod le fait, `scripts/prepare-e2e.sh` aussi). Sans image : bloc `UIcon` neutre (`BookCover.vue`, `ToolThumbnail.vue`).
+- Front : `UFileUpload` (`v-model` `File | null`, ou `multiple` pour plusieurs) dans un `useForm` : Inertia passe en FormData tout seul ; une modification avec fichier part en `form.transform(d => ({ ...d, _method: 'patch' })).post(...)` (PHP ne lit pas le multipart en PATCH).
+- Liste ordonnée mêlant éléments existants et neufs (photos d'outil) : `photos[i][id]` (existant, vérifié appartenir à **cet** outil) ou `photos[i][file]` ; l'ordre posté fait foi, les absents sont supprimés.
+- Tests : `Storage::fake('public')`, `UploadedFile::fake()->image()`, helpers `storedImage()`, `transparentPng()`, `photoWithExif()`, `truncatedJpeg()` de `tests/Pest.php` ; Vitest (happy-dom) : définir `URL.createObjectURL` pour l'aperçu (absent), le retirer en `afterEach`.
 
 ### Verrou et courses (écritures sensibles)
 - `DB::transaction` + `Model::query()->lockForUpdate()->findOrFail()` puis revérifier l'état sur le modèle relu (modèle : `AccountRequestReviewService::lockPending`).
@@ -207,7 +220,7 @@
 
 ## Décisions et conventions
 
-- Tests : Pest en SQLite mémoire (`phpunit.xml`), file `sync`, mail `array` ; CI backend sur MySQL ; pas de build Vite requis (F00).
+- Tests : Vitest tourne sous **happy-dom** (`vitest.config.ts`), pas jsdom ; Pest en SQLite mémoire (`phpunit.xml`), file `sync`, mail `array` ; CI backend sur MySQL ; pas de build Vite requis (F00).
 - Aucun fichier de traduction : textes d'interface en français en dur ; seuls les messages Laravel sont dans `lang/fr/` (F00).
 - Ziggy en liste d'autorisation par groupe ; la liste dépend de la connexion et du rôle, d'où le rechargement complet (`Inertia::location`) à la connexion/déconnexion et quand l'état d'authentification change (F02).
 - Un admin est aussi un membre : `rolesOf('admin')` = `['admin','user']` (F02).
@@ -235,9 +248,14 @@
 - Données Google et URL de couverture distantes jamais exposées au front ni stockées : seule la réponse du endpoint `{volume_id, title, author, cover_url}` sort (F07).
 - Scan EAN-13 : dépendance `barcode-detector` (API standard `BarcodeDetector`, natif préféré) ; le `.wasm` zxing est servi par notre build (`zxing-wasm/reader/zxing_reader.wasm?url`, chargé à la demande), **aucun CDN** : override `locateFile`, plugin Vite et `scripts/check-build-no-cdn.mjs` en défense ; une mise à jour de la bibliothèque qui change l'URL de repli ou le `.wasm` fait échouer le build, à traiter plutôt que contourner (F08).
 - Scan : seul un EAN-13 de livre (978/979, clé juste) est accepté, un autre code est ignoré avec un message discret ; l'image d'une photo est décodée dans le navigateur, jamais envoyée au serveur ; un scan valide remplit l'ISBN et lance seul la recherche Google Books (F08).
+- Marques d'outils : liste **partagée** par toute la famille (table `brands`, hors compte), jamais supprimée (`restrictOnDelete`), pas d'écran de gestion avant nouvel ordre ; une marque saisie est comparée par `normalized_name` (« bosch » = « BOSCH  »), la première saisie fixe la casse ; elle est créée **dans la transaction de l'outil**, après l'écriture des photos (F10).
+- Accessoires d'un outil : simples noms sans identité côté serveur, **remplacés en bloc** à chaque modification (suppression puis recréation, positions 1..n) ; 30 au plus, 100 caractères (F10).
+- Photos d'un outil : 8 au plus, 1200 px de large, JPEG sans EXIF, la première est la vignette (même fichier) ; mêmes limites d'envoi que les couvertures (10 Mo, 6000 px, JPEG/PNG/WebP) ; ordre par boutons monter/descendre (F10).
+- Outil : nom 255, marque 100 ; liste triée par nom puis id ; filtres `?shelf=` et `?brand=` combinables, 404 si inconnus ou hors du périmètre du membre ; étagère d'un autre membre ou de la bibliothèque dans `shelf_ids` = erreur de validation (F10).
+- Un module Garage ne partage que le générique : l'image (`ResizedJpegStorage`, `ImageUploadRules`) est extraite à la deuxième utilisation (F10), `BookCoverService` garde son API (F10).
 - `route()` du front vient de `ziggy-js` (`skip-route-function`), en URL relative (`false`) (F01).
 - `Fortify` : fonctionnalité `resetPasswords()` uniquement ; routes d'auth écrites dans `routes/web.php` ; `laravel/passkeys` est présent mais inactif (F02).
-- Pas de Playwright hors parcours clés ; `tests/e2e/login.spec.ts` (F02) et `tests/e2e/book.spec.ts` (étagère puis livre, F06) ; job CI `e2e`.
+- Pas de Playwright hors parcours clés ; `tests/e2e/{login,book,tool}.spec.ts` (connexion F02 ; étagère puis livre F06 ; étagère puis outil F10) ; job CI `e2e`.
 
 ## Pièges connus
 
@@ -255,7 +273,7 @@
 
 - Collations : `utf8mb4_unicode_ci` (MySQL) ignore casse **et accents**, SQLite compare octet par octet (sensible à la casse) : un index unique sur un texte libre ne se comporte pas pareil en local et en prod. Indexer une colonne normalisée en PHP et la passer en `utf8mb4_bin` sous MySQL (`->collation()` seulement si le driver est `mysql` : SQLite ne connaît pas cette collation).
 
-### Upload et couvertures (relevés en relecture F06)
+### Upload, couvertures et photos (relevés en relecture F06 et F10)
 - Une rotation GD copie l'image : redimensionner **avant** de pivoter, sinon la mémoire double. Pour un quart de tour (EXIF 6 ou 8), la largeur cible est la hauteur de la source (4032×3024 → 800×1067).
 - Écrire le fichier avant la transaction et le supprimer si elle échoue ; supprimer l'ancien fichier seulement après le commit (`BookService::withNewCover`). Tests : faire échouer `Book::saving` et vérifier le disque.
 - Garder les bornes de dimensions (`Rule::dimensions()`) : sans elles GD peut épuiser la mémoire sur une image légère mais énorme.
@@ -263,7 +281,12 @@
 - Un fichier ne part pas en PATCH (PHP ne lit pas le multipart) : `POST` + `_method=patch` ; `Update` doit rester testé avec fichier.
 - La cascade SQL ne supprime pas les fichiers : tout nouveau chemin de suppression de livre (ou de compte) doit appeler `BookCoverService::delete`.
 - `UploadedFile::fake()->image()` est opaque : `transparentPng()` pour tester le fond blanc.
-- Étagère d'un autre dans `bookshelf_ids` : `Rule::exists(...)->where('user_id', …)` obligatoire, sinon on range son livre sur l'étagère d'un autre.
+- Étagère d'un autre dans `bookshelf_ids` / `shelf_ids` : `Rule::exists(...)->where('user_id', …)` obligatoire, sinon on range son objet sur l'étagère d'un autre.
+- Suppression d'un outil : transaction, verrou de la ligne de l'outil, lecture des chemins, suppression, effacement des fichiers **après** le commit (une suppression en échec garde lignes et fichiers). Même verrou en modification (`ToolService::lock`).
+- Un JPEG tronqué passe la validation (en-tête lisible) mais GD ne le décode pas : `UnreadableImageException` → erreur sur `photos` ; rien ne doit rester (ni marque, ni fichier).
+- Id de photo posté pour un autre outil : refusé par la validation (`Rule::exists` limité à l'outil) ; ne jamais faire confiance à un id de ligne enfant.
+- Taille des envois : 25 Mo pour tout le site (nginx `client_max_body_size`, PHP `post_max_size`), routes visiteurs comprises. **Toute nouvelle route d'upload volumineux doit avoir son propre bloc nginx** (modèle : `location ~ ^/garage/tools(/\d+)?$`, 90 Mo, F10) qui passe directement à `index.php` (pas de `try_files` : la taille est contrôlée dans la location qui lit le corps) et relève `post_max_size` par `PHP_VALUE`. Ne jamais relever la limite globale. `PHP_VALUE` reste dans le processus PHP-FPM pour les requêtes suivantes : n'y mettre que des valeurs sans effet ailleurs (`post_max_size`, déjà borné par nginx), pas `upload_max_filesize`.
+- Donnée partagée créée pendant un enregistrement (marque d'outil) : la créer dans la transaction, après l'écriture des fichiers, pour qu'un échec ne laisse rien ; après une violation d'unicité, relire avec `lockForUpdate()` (une lecture simple en REPEATABLE READ ne voit pas la ligne de la requête concurrente).
 
 ### Appels externes et Google Books (relevés en relecture F07)
 - SSRF : ne télécharger qu'en https, hôte exact de `cover_hosts`, sans identifiants ni port ; refuser aussi chaque redirection non conforme, **avant** toute requête vers l'hôte. Google liste ses images en `http://` : relever en https seulement pour un hôte autorisé.
@@ -296,7 +319,7 @@
 - `components.d.ts` et `auto-imports.d.ts` sont générés (unplugin) mais versionnés : ils changent après `npm run build` ou Vitest ; ne les éditer pas à la main, committer leur régénération seulement si une feature change les composants utilisés.
 - Un changement de redirection (`/library`) casse des tests d'une feature précédente : les ajuster (jamais les retirer), comme `BookshelfIndexTest` et `BookshelfAccessTest` en F06.
 - Les tests existants qui comptent les entrées de menu doivent être ajustés (jamais retirés) quand un module ajoute une entrée.
-- Playwright : navigateurs non téléchargeables ici ; en local `PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/google-chrome`, la CI installe chromium.
+- Playwright : `scripts/prepare-e2e.sh` lance aussi `php artisan storage:link --force` : sans lui une image uploadée en e2e n'est pas servie (404 sur `/storage/...`) ; navigateurs non téléchargeables ici ; en local `PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/google-chrome`, la CI installe chromium.
 
 ### Environnement de travail des agents
 - Utiliser `FETCH_HEAD` : le dépôt n'a pas de refspec de fetch, `origin/<branche>` n'existe pas ou est périmé (`git fetch origin <branche>` puis `git checkout -B <branche> FETCH_HEAD` ; push avec `git -c push.negotiate=true push origin HEAD:<branche>`).
@@ -309,15 +332,11 @@
 
 ## Notes pour les features à venir
 
-- F11 : `BookPolicy` n'autorise que le propriétaire (404 sinon) ; la lecture seule des autres membres demande une Policy de consultation distincte, sans toucher à `update`/`delete`. `BookResource` expose déjà `cover_url`.
-- F12 : source de recherche livres : `books` (titre, auteur, ISBN) ; index `user_id`+`title` seulement.
-- F10 : la Policy du modèle appartenant à un membre suit `ToolShelfPolicy`/`BookshelfPolicy` (404 pour un autre membre) ; la lecture seule des autres membres arrive en F11, avec ses propres Policies de consultation.
-- F10 : pivot prévu `tool_tool_shelf` (`tool_id`, `tool_shelf_id`, FK cascade des deux côtés comme `book_bookshelf`) : supprimer une étagère ne retire que les liens, sans code dans `ToolShelfService` ; relation `ToolShelf::tools()`. `ToolShelfResource` pourra gagner un résumé `{id, name}` pour la fiche outil.
-- F10 : faire pointer `GarageController` (`/garage`) vers « Mes outils », comme `LibraryController` vers « Mes livres » en F06 ; le test de redirection de `tests/Feature/Garage/ToolShelfIndexTest.php` est alors à ajuster (jamais retiré) ; ajouter un bouton « Mes outils » et un lien « Voir les outils » par étagère comme en Library.
-- F10 : l'entrée de menu `garage.index` reste active sur toutes les pages `/garage/…` ; ajouter le parcours Playwright « ajout outil » (`tests/e2e/`).
+- F12 : sources de recherche : `books` (titre, auteur, ISBN ; index `user_id`+`title` seulement) et `tools` (nom, marque via `brands.normalized_name`, accessoires ; index `user_id`+`name` seulement).
+- F11 : `BookPolicy` et `ToolPolicy` n'autorisent que le propriétaire (404 sinon) ; la lecture seule des autres membres demande des Policies de consultation distinctes, sans toucher à `update`/`delete` (`view` actuel inchangé), et des Resources sans actions. `BookResource` expose déjà `cover_url`. `ToolResource` et `ToolDetailsResource` exposent déjà `thumbnail_url`, `photos`, `accessories`, `brand`, `shelves` ; `ToolService::listFor` charge `brand`, `shelves`, `thumbnail` (pas de N+1). Les marques sont communes : un filtre par marque d'un autre membre doit rester borné à ses outils (`brandsOf`).
 - F12 : chaque module fournit sa source de recherche globale ; `UDashboardSearch` a `:groups="[]"` et un texte « arrive bientôt » dans `DashboardLayout.vue` à remplacer.
 - F13 : la page de contrôle admin ira dans le groupe `admin` de Ziggy (`$adminRoutes`).
 - F13 : le journal `google_books_requests` (F07, modèle `App\Models\Library\GoogleBooksRequest`, statuts `GoogleBooksRequestStatus`) grossit sans fin : le purger (`Prunable` + durée de conservation configurable, `model:prune` planifié) ; un index `(status, created_at)` sera probablement utile pour les filtres de la page de contrôle (seul `created_at` est indexé aujourd'hui).
 - F14 : la caméra du scanner (F08) exige HTTPS (sauf `localhost`) ; nginx doit servir `.wasm` en `application/wasm` (sinon repli sans streaming, plus lent) ; configurer `trustProxies` (sinon tous les visiteurs partagent la même IP dans les limiteurs) ; les liens d'invitation signés exigent la bonne config proxy/HTTPS ; masquer `signature` dans les logs Nginx.
 - Les comptes ne peuvent pas être supprimés aujourd'hui ; les étagères se suppriment en cascade avec le compte.
-- Si un jour un compte peut être supprimé, supprimer aussi ses couvertures (`books.cover_path` ; la cascade SQL ne nettoie pas le disque).
+- Si un jour un compte peut être supprimé, supprimer aussi ses couvertures (`books.cover_path`) et ses photos d'outils (`tool_photos.path`) : la cascade SQL ne nettoie pas le disque.

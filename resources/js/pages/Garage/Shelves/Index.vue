@@ -60,6 +60,17 @@ function move(shelf: ToolShelf, direction: ToolShelfMoveDirection): void {
     :breadcrumb="breadcrumb"
   >
     <div class="mx-auto w-full max-w-3xl space-y-6">
+      <div class="flex justify-end">
+        <UButton
+          :to="route('garage.tools.index', undefined, false)"
+          icon="i-lucide-wrench"
+          color="neutral"
+          variant="ghost"
+        >
+          Mes outils
+        </UButton>
+      </div>
+
       <UCard>
         <UForm
           :state="createForm"
@@ -118,6 +129,14 @@ function move(shelf: ToolShelf, direction: ToolShelfMoveDirection): void {
             <span class="min-w-0 flex-1 truncate font-medium text-highlighted">{{ shelf.name }}</span>
 
             <div class="flex shrink-0 gap-1">
+              <UButton
+                :to="route('garage.tools.index', { shelf: shelf.id }, false)"
+                icon="i-lucide-wrench"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                :aria-label="`Voir les outils de l'étagère ${shelf.name}`"
+              />
               <UButton
                 icon="i-lucide-arrow-up"
                 color="neutral"

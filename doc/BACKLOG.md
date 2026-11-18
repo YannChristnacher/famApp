@@ -18,7 +18,7 @@ Chaque feature a son plan dans `doc/features/<id>-<slug>.md` avant d'être codé
 | F07 | Bibliothèque : préremplissage par ISBN via Google Books (service, données brutes, couverture stockée) | Library | F06 | terminée |
 | F08 | Bibliothèque : scan du code-barres EAN-13 à la caméra | Library | F07 | terminée |
 | F09 | Garage : CRUD des étagères | Garage | F02 | terminée |
-| F10 | Garage : CRUD des outils (marques partagées, photos multiples, accessoires) | Garage | F09 | à faire |
+| F10 | Garage : CRUD des outils (marques partagées, photos multiples, accessoires) | Garage | F09 | terminée |
 | F11 | Consultation des bibliothèques et garages des autres membres (lecture seule) | Library, Garage | F06, F10 | à faire |
 | F12 | Recherche globale : endpoint agrégé par module + palette `UDashboardSearch` | Core | F11 | à faire |
 | F13 | Page de contrôle admin : demandes, compteurs, derniers ajouts, connexions, jobs en échec, erreurs, appels Google Books | Admin | F12 | à faire |
