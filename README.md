@@ -17,7 +17,7 @@ docker compose exec app php artisan migrate --seed
 ```
 
 - Application : http://localhost:8080
-- Vite (rechargement à chaud) : http://localhost:5173
+- Vite (rechargement à chaud) : http://localhost:5173 — pour tester depuis un téléphone du réseau local, mettre l'IP du PC dans `VITE_HMR_HOST` (`.env`) puis `docker compose up -d vite`
 - Mailpit (emails envoyés) : http://localhost:8025
 
 ## Qualité
