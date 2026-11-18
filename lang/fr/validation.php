@@ -257,6 +257,7 @@ return [
         'product_uuid'             => 'UUID du produit',
         'promo_code'               => 'code promo',
         'province'                 => 'région',
+        'q'                        => 'recherche',
         'quantity'                 => 'quantité',
         'reason'                   => 'raison',
         'recaptcha_response_field' => 'champ de réponse reCAPTCHA',

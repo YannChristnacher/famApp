@@ -8,6 +8,7 @@ use App\Http\Controllers\Auth\InvitationController;
 use App\Http\Controllers\Core\FamilyController;
 use App\Http\Controllers\Core\HomeController;
 use App\Http\Controllers\Core\MemberController;
+use App\Http\Controllers\Core\SearchController;
 use App\Http\Controllers\Garage\GarageController;
 use App\Http\Controllers\Garage\ToolController;
 use App\Http\Controllers\Garage\ToolShelfController;
@@ -61,6 +62,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
     Route::get('/', HomeController::class)->name('home');
+
+    // Global search of the header: every module answers through its source (SearchRegistry).
+    Route::get('/search', SearchController::class)
+        ->middleware('throttle:search')
+        ->name('search');
 
     Route::prefix('library')->name('library.')->group(function () {
         Route::get('/', LibraryController::class)->name('index');
