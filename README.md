@@ -42,7 +42,7 @@ docker compose exec app php artisan storage:link   # une fois, pour voir les ima
 - Le compte administrateur de `.env` (`ADMIN_EMAIL`, `ADMIN_PASSWORD`) est créé au passage s'il n'existe pas encore.
 - Relancer la commande ne recrée rien ; pour repartir de zéro, utiliser `migrate:fresh` (les anciennes images restent dans `storage/app/public/covers` et `storage/app/public/tools`, à supprimer à la main si besoin).
 - Les images sont dessinées localement (aucun téléchargement). Relancer un job en échec depuis « Contrôle » enregistre une demande de compte fictive et envoie un email visible dans Mailpit (worker `queue` démarré).
-- **Jamais en production** : le seeder refuse de tourner avec `APP_ENV=production` (comptes au mot de passe connu).
+- **Jamais en production** : chaque seeder de démonstration (`DemoSeeder` comme ses parties `Database\Seeders\Demo\*`) ne tourne que si `APP_ENV` vaut `local` ou `testing` ; tout autre environnement (`production`, `staging`…) est refusé avec un message, sans rien écrire (comptes au mot de passe connu).
 
 ## Qualité
 
