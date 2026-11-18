@@ -41,14 +41,18 @@ services:
   vite:
     image: node:22-bookworm-slim
     working_dir: /app
-    command: sh -c "npm install && npm run dev"
+    # node_modules lives in a container-only volume: host-installed native binaries
+    # (esbuild, rollup, tailwind oxide) do not run in this Linux container.
+    command: sh -c "npm ci && npm run dev"
     environment:
       VITE_HMR_HOST: ${VITE_HMR_HOST:-localhost}
       VITE_HMR_CLIENT_PORT: ${VITE_PORT:-5173}
+      VITE_USE_POLLING: ${VITE_USE_POLLING:-false}
     ports:
       - "${VITE_PORT:-5173}:5173"
     volumes:
       - .:/app
+      - vite-node-modules:/app/node_modules
 
   mysql:
     image: mysql:8.4
@@ -74,3 +78,4 @@ services:
 
 volumes:
   mysql-data:
+  vite-node-modules:
