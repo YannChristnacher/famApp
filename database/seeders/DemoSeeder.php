@@ -6,29 +6,21 @@ use App\Enums\Role;
 use App\Models\User;
 use Database\Seeders\Demo\DemoAccountsSeeder;
 use Database\Seeders\Demo\DemoActivitySeeder;
+use Database\Seeders\Demo\DemoDataSeeder;
 use Database\Seeders\Demo\DemoGarageSeeder;
 use Database\Seeders\Demo\DemoLibrarySeeder;
 use Database\Seeders\Demo\DemoMembers;
-use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 
 /**
  * Demo data set for local use: php artisan db:seed --class=DemoSeeder
- * (or migrate:fresh --seed --seeder=DemoSeeder to start again). Refuses to
- * run in production; does nothing once the demo data is loaded.
+ * (or migrate:fresh --seed --seeder=DemoSeeder to start again). Only runs in
+ * the environments of DemoDataSeeder; does nothing once the demo data is loaded.
  */
-class DemoSeeder extends Seeder
+class DemoSeeder extends DemoDataSeeder
 {
     public function run(): void
     {
-        if (app()->isProduction()) {
-            throw new RuntimeException(
-                'Les données de démonstration ne peuvent pas être chargées en production (APP_ENV=production) : '
-                .'elles créent des comptes au mot de passe connu.'
-            );
-        }
-
         if (User::query()->where('email', DemoMembers::ADMIN_EMAIL)->exists()) {
             $this->command?->warn(
                 'Les données de démonstration sont déjà chargées : rien n\'a été recréé. '

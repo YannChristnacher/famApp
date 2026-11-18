@@ -15,7 +15,12 @@ use App\Models\Library\GoogleBooksRequest;
 use App\Models\User;
 use App\Rules\Library\Isbn;
 use App\Services\Admin\FailedJobService;
+use Database\Seeders\Demo\DemoAccountsSeeder;
+use Database\Seeders\Demo\DemoActivitySeeder;
+use Database\Seeders\Demo\DemoDataSeeder;
+use Database\Seeders\Demo\DemoGarageSeeder;
 use Database\Seeders\Demo\DemoImageGenerator;
+use Database\Seeders\Demo\DemoLibrarySeeder;
 use Database\Seeders\Demo\DemoMembers;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Support\Facades\Artisan;
@@ -190,16 +195,35 @@ it('adds two retryable failed jobs without secrets in their payload', function (
     }
 });
 
-it('refuses to run in production and writes nothing', function () {
-    app()->detectEnvironment(fn () => 'production');
+dataset('demo seeders', [
+    'DemoSeeder' => DemoSeeder::class,
+    'DemoAccountsSeeder' => DemoAccountsSeeder::class,
+    'DemoLibrarySeeder' => DemoLibrarySeeder::class,
+    'DemoGarageSeeder' => DemoGarageSeeder::class,
+    'DemoActivitySeeder' => DemoActivitySeeder::class,
+]);
 
-    expect(fn () => Artisan::call('db:seed', ['--class' => DemoSeeder::class, '--force' => true]))
-        ->toThrow(RuntimeException::class, 'production');
+it('refuses to run outside the allowed environments and writes nothing', function (string $seeder, string $environment) {
+    app()->detectEnvironment(fn () => $environment);
+
+    expect(fn () => Artisan::call('db:seed', ['--class' => $seeder, '--force' => true]))
+        ->toThrow(RuntimeException::class, "l'environnement « {$environment} »");
 
     expect(User::query()->count())->toBe(0)
-        ->and(Book::query()->count())->toBe(0)
+        ->and(AccountRequest::query()->count())->toBe(0)
+        ->and(GoogleBooksRequest::query()->count())->toBe(0)
+        ->and(DB::table('failed_jobs')->count())->toBe(0)
         ->and(Storage::disk('public')->allFiles())->toBe([]);
-});
+})->with('demo seeders')->with(['production', 'staging', 'prod']);
+
+it('runs in the allowed environments', function (string $environment) {
+    app()->detectEnvironment(fn () => $environment);
+
+    Artisan::call('db:seed', ['--class' => DemoSeeder::class, '--force' => true]);
+
+    expect(User::query()->where('email', DemoMembers::ADMIN_EMAIL)->exists())->toBeTrue()
+        ->and(DemoDataSeeder::ALLOWED_ENVIRONMENTS)->toBe(['local', 'testing']);
+})->with(['local', 'testing']);
 
 it('does nothing more when run again', function () {
     seed(DemoSeeder::class);

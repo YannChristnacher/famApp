@@ -6,14 +6,13 @@ use App\Models\Library\Book;
 use App\Models\Library\Bookshelf;
 use App\Models\User;
 use Carbon\CarbonInterface;
-use Illuminate\Database\Seeder;
 
 /**
  * Bookshelves of every demo member and thirty real books (French editions,
  * real ISBN-13), on zero to several bookshelves, some with a comment, most
  * with a cover drawn locally.
  */
-class DemoLibrarySeeder extends Seeder
+class DemoLibrarySeeder extends DemoDataSeeder
 {
     /**
      * Bookshelves of each member, in their order.

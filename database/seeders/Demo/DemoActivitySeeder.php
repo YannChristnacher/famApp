@@ -7,7 +7,6 @@ use App\Enums\Library\GoogleBooksRequestType as Type;
 use App\Jobs\Auth\SubmitAccountRequest;
 use App\Models\Library\GoogleBooksRequest;
 use App\Models\User;
-use Illuminate\Database\Seeder;
 use Illuminate\Queue\Failed\FailedJobProviderInterface;
 use Illuminate\Queue\MaxAttemptsExceededException;
 use Illuminate\Support\Str;
@@ -20,7 +19,7 @@ use Throwable;
  * account request of a fictitious visitor: a retry records it and emails the
  * administrators) or deleted.
  */
-class DemoActivitySeeder extends Seeder
+class DemoActivitySeeder extends DemoDataSeeder
 {
     private const COVER_QUERY = 'books.google.com/books/content';
 

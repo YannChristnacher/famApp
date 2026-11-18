@@ -4,14 +4,13 @@ namespace Database\Seeders\Demo;
 
 use App\Models\Auth\AccountRequest;
 use App\Models\User;
-use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
 /**
  * Demo accounts (activated members, one of them administrator, and a pending
  * invitation) and account requests in every status.
  */
-class DemoAccountsSeeder extends Seeder
+class DemoAccountsSeeder extends DemoDataSeeder
 {
     public function run(): void
     {

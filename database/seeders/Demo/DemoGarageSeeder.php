@@ -7,14 +7,13 @@ use App\Models\Garage\ToolShelf;
 use App\Models\User;
 use App\Services\Garage\BrandService;
 use Carbon\CarbonInterface;
-use Illuminate\Database\Seeder;
 
 /**
  * Tool shelves of every demo member and twenty real tools: shared brands
  * (resolved like a typed brand, so "bosch" joins "Bosch"), accessories, zero
  * to three photos drawn locally, shelves, some comments.
  */
-class DemoGarageSeeder extends Seeder
+class DemoGarageSeeder extends DemoDataSeeder
 {
     /**
      * Tool shelves of each member, in their order.
