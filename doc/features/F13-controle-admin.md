@@ -58,3 +58,11 @@ L'administrateur dispose d'une **page de contrôle** (`/admin/control`, entrée 
 - Branch: feature/F13-controle-admin
 - Tests written: yes (tests/Feature/Admin/{ControlPanelAccess,ControlPanelData,FailedJobs,ErrorLog,GoogleBooksActivity,RecordLastLogin,GoogleBooksJournalPruning}Test.php, tests/Unit/Core/SecretMaskerTest.php, AdminRouteListTest complété ; Vitest pages/Admin/Control/Index.test.ts, components/Admin/Control/FailedJobsTable.test.ts, support/admin/relativeTime.test.ts, DashboardLayout.admin.test.ts complété, registry.test.ts et DashboardLayout.roles.test.ts ajustés pour la nouvelle entrée)
 - Tests passing: yes en local (composer test, composer lint, npm run test, npm run lint, npm run build)
+
+## Relecture (2026-11-18)
+Relecteur indépendant : aucun point bloquant. Corrigés :
+- Relance d'un job : refusée avant `queue:retry` si la ligne a disparu ou si le payload n'est pas un objet JSON (sinon la commande pousse `"null"` dans la file et supprime la ligne) ; tout échec de la commande (commande sérialisée corrompue, commande chiffrée illisible) est rapporté puis traduit en `FailedJobNotRetryableException` (toast d'erreur français, retour sur la page), la ligne `failed_jobs` restant intacte.
+- `FailedJobActionRequest` (`authorize()` = Gate `admin`) sur la relance et la suppression, en plus du middleware.
+- Lecture du log : fichiers retenus seulement s'ils sont lisibles et ne sont pas des liens symboliques ; toute erreur de lecture (fichier supprimé par la rotation, illisible) donne une liste vide, jamais une 500 ; fichier toujours refermé (taille 0 comprise) ; contexte en liste (` ["…`) coupé aussi.
+- `SecretMasker` : identifiants dans une URL (`scheme://***@`), `Authorization: Basic|Digest ***` (reste de la ligne), `base64:` de 20 caractères ou plus, hachés bcrypt et argon2, JWT, clés `pwd`, `pass`, `credential`, `session`, `csrf`, `remember_`, valeur JSON entre guillemets entièrement masquée (espaces et guillemets échappés compris).
+- Le test « fichier illisible » est ignoré sous root (root lit tout) : il tourne en CI (utilisateur `runner`).
