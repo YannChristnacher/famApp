@@ -1,5 +1,5 @@
 # Mémoire partagée famApp
-> À lire avant d'explorer le code. Mise à jour par l'agent scribe à chaque feature. Dernière mise à jour : F12.
+> À lire avant d'explorer le code. Mise à jour par l'agent scribe à chaque feature. Dernière mise à jour : F13.
 
 ## État du projet
 
@@ -14,7 +14,8 @@
 - F10 garage : CRUD des outils (marques partagées, photos multiples, accessoires), extraction du pipeline d'image dans `ResizedJpegStorage` (PR #11) : relue et validée ; le statut final dans le backlog passe à `terminée` au merge (F06 à F09 le sont déjà ou le seront au merge de leur PR).
 - F11 consultation : « La famille » et page d'un membre (bibliothèque et garage des autres en lecture seule), fiches livre/outil lisibles par tous, `view` des Policies ouvert (PR #12) : relue et validée ; le statut final dans le backlog passe à `terminée` au merge.
 - F12 recherche globale : palette de l'en-tête (`UDashboardSearch`) alimentée par un endpoint `GET /search` qui agrège une source par module (livres, outils, membres) (PR #13) : relue et validée sans correction ; le statut final dans le backlog passe à `terminée` au merge.
-- Prochaine : F13 (page de contrôle admin, dépend de F12).
+- F13 page de contrôle admin (`/admin/control` : compteurs, derniers ajouts et connexions, jobs en échec relançables, dernières erreurs du log, activité Google Books ; purge du journal Google Books) (PR #14) : relue et validée ; le statut final dans le backlog passe à `terminée` au merge.
+- Prochaine et dernière : F14 (déploiement production sur VPS, dépend de F13).
 - Suite du backlog : `doc/BACKLOG.md` (source de vérité des statuts).
 
 ## Carte du code par module
@@ -35,10 +36,11 @@
 - `app/Support/OrderedPositions.php` : `swapWithNeighbour(Collection, Model, offset)` (échange avec la voisine, rien aux bornes) et `save(Collection)` (renumérotation 1..n en deux temps sous index unique). Partagé Library et Garage ; l'appelant lit et écrit sous le verrou du propriétaire.
 - `app/Services/Core/ResizedJpegStorage.php` : pipeline d'image partagé (livres et outils) : `store(UploadedFile, dossier, largeurMax)` (GD, JPEG 85 sur fond blanc, sans EXIF, `<dossier>/<40 car.>.jpg`, disque `public` = constante `DISK`), `delete(?string)`, `url(?string)` ; lève `app/Exceptions/Core/UnreadableImageException.php` si GD ne décode pas (l'appelant la traduit en erreur de validation).
 - `app/Support/ImageUploadRules.php` : `rules()` (JPEG/PNG/WebP lus dans le contenu, 10 Mo, 6000 px de côté par `Rule::dimensions`), constantes `MAX_KILOBYTES`, `MAX_PIXELS_PER_SIDE` ; utilisé par `BookRequest` (`cover`) et `ToolRequest` (`photos.*.file`).
+- `app/Support/SecretMasker.php` : `mask(string)`, masque (`***`) identifiants d'URL, `Authorization`, `Bearer`, JWT, clés Google `AIza…`, `base64:`, hachés bcrypt/argon2 et valeur des clés `password|token|signature|key|secret|cookie|session|csrf…` (forme `a=b`, `a: b`, JSON). Protection supplémentaire, pas une garantie. `app/Support/TruncatedText.php` : `of(text, max)` (UTF-8 invalide remplacé, puis `…`).
 - `app/Support/ZiggyGroup.php` : groupes Ziggy imprimés selon l'utilisateur (`['guest']`, `['auth']`, `['auth','admin']`).
 - `config/ziggy.php` : liste d'autorisation des routes du front (groupes `guest`, `auth`, `admin` + `only`).
-- `config/famapp.php` : `admin.*` (`ADMIN_NAME|EMAIL|PASSWORD`), `invitation_expire_days` (7).
-- `config/services.php` → `google_books` : `key` (`GOOGLE_BOOKS_API_KEY`, optionnelle), `base_url`, `timeout` (5), `cache_minutes` (30), `save_calls_per_minute` (20), `cover_hosts`, `cover_max_kilobytes` (2048), `cover_timeout` (5).
+- `config/famapp.php` : `admin.*` (`ADMIN_NAME|EMAIL|PASSWORD`), `invitation_expire_days` (7), `control.*` (F13 : `recent_limit` 10, `log_directory`, `log_tail_bytes` 256 Ko, `message_max_length` 300).
+- `config/services.php` → `google_books` : `key` (`GOOGLE_BOOKS_API_KEY`, optionnelle), `base_url`, `timeout` (5), `cache_minutes` (30), `save_calls_per_minute` (20), `cover_hosts`, `cover_max_kilobytes` (2048), `cover_timeout` (5), `journal_retention_days` (90, `GOOGLE_BOOKS_JOURNAL_RETENTION_DAYS`).
 - `bootstrap/app.php` : alias middleware `guest` (remplacé) et `invitation`, `authenticateSessions()`, `UnauthenticatedResponse`.
 - Front : `resources/js/app.ts`, `appRoot.ts` (`UApp` + locale `fr`, partagé avec les tests), `layouts/DashboardLayout.vue`, `layouts/AuthLayout.vue`.
 - `navigation/registry.ts` (`navigationRegistry`, `filterEntriesByRoles`, `toNavigationMenuItems`, `isActiveUrl`), `navigation/types.ts`, `navigation/modules/{core,library,garage,admin}.ts`.
@@ -49,7 +51,8 @@
 
 ### Auth
 - `app/Enums/Role.php` (`Admin`, `User`, `assignableValues()`), `app/Models/User.php` (`isAdmin()`, `hasSetPassword()`, `bookshelves()`, rôle non assignable en masse).
-- `users` : `role` (défaut `user`), `password_set_at` (nul = invitation utilisable).
+- `users` : `role` (défaut `user`), `password_set_at` (nul = invitation utilisable), `last_login_at` (F13, nul = jamais connecté, indexé ; heure seulement, ni IP ni agent ; jamais dans `auth.user`).
+- `app/Listeners/Auth/RecordLastLogin.php` : écoute `Illuminate\Auth\Events\Login` (découverte automatique), `forceFill` + `saveQuietly()`.
 - `app/Providers/FortifyServiceProvider.php` : `Fortify::ignoreRoutes()`, réponses personnalisées. Routes d'auth déclarées dans `routes/web.php`.
 - `app/Http/Controllers/Auth/{AuthPageController,AccountRequestController,InvitationController}.php`.
 - `app/Http/Responses/Auth/*` : `LoginResponse`, `LogoutResponse` (`Inertia::location`), `PasswordResetLinkRequestedResponse` (réponse neutre), `InvalidPasswordResetResponse`, `UnauthenticatedResponse`.
@@ -70,6 +73,13 @@
 - `app/Http/Requests/Admin/StoreAccountFromRequestRequest.php` (vérifie aussi le Gate), `app/Http/Resources/Admin/AccountRequestResource.php`.
 - Pages : `pages/Admin/AccountRequests/{Index,CreateAccount}.vue`, `components/Admin/AccountRequestsTable.vue`.
 - Tests : `tests/Feature/Admin/*` (dont `AdminRouteListTest`, `AccountRequestAccessTest`), `resources/js/pages/Admin/**`, `DashboardLayout.admin.test.ts`.
+
+#### Admin : page de contrôle (F13)
+- `Admin/ControlPanelController` (invocable, `GET /admin/control`, `admin.control`) → `Admin/Control/Index` ; props `pendingAccountRequests`, `counts`, `recentAdditions`, `recentLogins`, `failedJobs` `{total, latest}`, `errors`, `googleBooks` `{periods, failures}` ; listes de `famapp.control.recent_limit`. `Admin/FailedJobController` : `retry` (`POST /admin/failed-jobs/{uuid}/retry`) et `destroy` (`DELETE …/{uuid}`), `whereUuid`, 404 si absent, toast puis `to_route('admin.control')`. `FailedJobActionRequest` (`authorize()` = Gate `admin`). Trois routes dans `$adminRoutes` de Ziggy.
+- `app/Services/Admin/` : `ControlCountsService` (demandes en attente, membres activés, invités, livres, outils, étagères des deux modules, marques), `RecentActivityService` (`latestAdditions` livres + outils mêlés, `latestLogins`), `FailedJobService` (`count`, `latest`, `exists`, `retry`, `forget`), `ErrorLogReader` (`latest`), `GoogleBooksActivityService` (`periods()` 24 h et 7 jours par statut + durée moyenne, `latestFailures`) ; DTO lecture seule `ErrorLogEntry`, `FailedJobSummary`, `GoogleBooksPeriodSummary`. `app/Exceptions/Admin/FailedJobNotRetryableException.php` : se rend en toast d'erreur + retour sur la page.
+- Resources `app/Http/Resources/Admin/{RecentAddition,RecentLogin,FailedJob,ErrorLogEntry,GoogleBooksPeriod,GoogleBooksFailure}Resource.php` ; libellés français de `GoogleBooksRequestStatus::label()` et `GoogleBooksRequestType::label()` fournis par le serveur.
+- Front : `pages/Admin/Control/Index.vue`, `components/Admin/Control/{ControlCounters,RecentAdditionsTable,RecentLoginsTable,FailedJobsTable,FailedJobActionModal,ErrorLogTable,GoogleBooksActivity,RelativeTime}.vue` (confirmation par `UModal` avant relance/suppression, aucun `v-html`), `support/admin/relativeTime.ts` (`relativeTime()` `Intl.RelativeTimeFormat('fr')`, `fullDate()` pour le `title`), types dans `types/admin.ts`, entrée « Contrôle » (`i-lucide-activity`) avant « Demandes de compte ».
+- Tests : `tests/Feature/Admin/{ControlPanelAccess,ControlPanelData,FailedJobs,ErrorLog,GoogleBooksActivity,RecordLastLogin,GoogleBooksJournalPruning}Test.php`, `tests/Unit/Core/SecretMaskerTest.php`, Vitest `pages/Admin/Control/Index.test.ts`, `components/Admin/Control/FailedJobsTable.test.ts`, `support/admin/relativeTime.test.ts`.
 
 ### Library
 - `bookshelves` : `id`, `user_id` (FK cascade), `name` (100, trimé), `normalized_name` (100, `utf8mb4_bin` sous MySQL), `position` (1..n compact), unique `user_id`+`normalized_name`, unique `user_id`+`position`. Pas de table « bibliothèque » : la bibliothèque d'un membre = ses étagères.
@@ -93,7 +103,7 @@
 - Tests : `tests/Feature/Library/*` (`Book{Access,Index,Pages}Test`, `{Store,Update,Destroy}BookTest`, `BookCoverServiceTest`, `BookshelfDeletionKeepsBooksTest`, `BookshelfNameUniquenessTest`, `BookshelfServiceLockTest`, `LibraryRouteListTest`), `tests/Unit/Library/{BookshelfPolicyTest,BookPolicyTest,IsbnTest}.php`, Vitest `pages/Library/Books/{Index,Show}.test.ts`, `components/Library/BookForm.test.ts`, `pages/Library/Bookshelves/Index.test.ts`, `DashboardLayout.library.test.ts`, Playwright `tests/e2e/book.spec.ts`.
 
 #### Library : Google Books (F07)
-- `google_books_requests` (journal, une ligne par appel sortant) : `id`, `user_id` (FK nulle, `nullOnDelete`), `type` (`GoogleBooksRequestType` : `isbn` recherche, `volume` confirmation à l'enregistrement, `cover` image), `query` (255 : ISBN, identifiant du volume, ou hôte+chemin de l'image sans query string), `status`, `http_status` (nul sans réponse), `duration_ms`, horodatage ; index sur `created_at` seulement. Migration `2026_11_17_*_create_google_books_requests_table.php`, modèle `app/Models/Library/GoogleBooksRequest.php`.
+- `google_books_requests` (journal, une ligne par appel sortant) : `id`, `user_id` (FK nulle, `nullOnDelete`), `type` (`GoogleBooksRequestType` : `isbn` recherche, `volume` confirmation à l'enregistrement, `cover` image), `query` (255 : ISBN, identifiant du volume, ou hôte+chemin de l'image sans query string), `status`, `http_status` (nul sans réponse), `duration_ms`, horodatage ; index sur `created_at` et (F13) `(status, created_at)` (migration `2026_11_21_100000_*`). Migration `2026_11_17_*_create_google_books_requests_table.php`, modèle `app/Models/Library/GoogleBooksRequest.php` : `MassPrunable`, `prunable()` = plus vieux que `services.google_books.journal_retention_days` (90) ; `Schedule::command('model:prune')->daily()` dans `routes/console.php`.
 - Statuts `app/Enums/Library/GoogleBooksRequestStatus.php` : `found`, `not_found` (aussi 404 HTTP), `rate_limited` (429 Google ou budget d'enregistrement épuisé), `client_error`, `server_error`, `timeout` (aussi toute `ConnectionException`), `invalid_response` (JSON invalide, redirection, fichier non image), `storage_failed` (écriture de la couverture impossible), `refused` (URL ou taille refusée avant tout appel, sans code HTTP). `fromFailedHttpStatus()` traduit un code HTTP.
 - `app/Services/Library/GoogleBooksService.php` : `findByIsbn(isbn, User): ?GoogleBooksVolume` (premier volume de `q=isbn:`, le met en cache) ; `trustedVolume(id, User)` (cache sinon `volumes/<id>`, `ValidationException` sur `google_volume_id` si introuvable, indisponible ou budget épuisé). Cache serveur `google-books:volume:<id>` = réponse brute, `cache_minutes`. Tout appel passe par `journaled()` (envoi, statut, journal).
 - `GoogleBooksVolume` (lecture seule : `id`, `title`, `author`, `coverUrl`, `raw`), `GoogleBooksUnavailableException` (statut + message français, porte le 503), `GoogleBooksJournal::record()`.
@@ -285,6 +295,8 @@
 - Code de consultation dans le module `Core` (il agrège Library et Garage) ; réutilise les services `listFor` et les Resources des modules (F11).
 - Recherche globale (F12) : un seul endpoint qui agrège une source par module (registre) ; **groupes (clé, intitulé, icône) et URL de chaque résultat fournis par le serveur**, le front n'a rien de propre à un module ; 5 résultats par groupe, 2 à 100 caractères ; « commence par » avant « contient » (libellé qui commence par le terme, puis toute autre correspondance, puis libellé et id) ; résultats de tous les membres ; membres activés seulement ; « chez vous » / « Vous » pour le chercheur ; pas d'étagères dans les résultats ; `LIKE` simple, sans moteur externe (ni Scout ni FULLTEXT).
 - Casse et accents de la recherche : MySQL (`utf8mb4_unicode_ci`) ignore casse et accents (« eleve » trouve « Élève ») ; SQLite (tests locaux) ignore seulement la casse ASCII, **pas les accents**. Le test d'accents ne tourne que sous MySQL (CI) ; les autres tests utilisent de l'ASCII.
+- Page de contrôle admin (F13) : les erreurs sont **lues dans le fichier de log** (`laravel*.log` le plus récent), pas dans une table alimentée par le gestionnaire d'exceptions : aucune écriture pendant une erreur, rien à purger. Niveau `ERROR` et au-delà, premier message de chaque entrée seulement.
+- Données sensibles de la page de contrôle : jamais le payload ni la trace d'un job (le nom vient de `displayName`, l'exception est réduite à sa première ligne), jamais de contexte JSON de log ; pas d'adresse IP de connexion (donnée personnelle inutile) ; tout texte masqué par `SecretMasker` puis tronqué à 300 caractères (F13).
 - `route()` du front vient de `ziggy-js` (`skip-route-function`), en URL relative (`false`) (F01).
 - `Fortify` : fonctionnalité `resetPasswords()` uniquement ; routes d'auth écrites dans `routes/web.php` ; `laravel/passkeys` est présent mais inactif (F02).
 - Pas de Playwright hors parcours clés ; `tests/e2e/{login,book,tool}.spec.ts` (connexion F02 ; étagère puis livre F06 ; étagère puis outil F10) ; job CI `e2e`.
@@ -339,6 +351,12 @@
 - Un `File` venant de `UFileUpload` (ou rangé dans un `ref`) est un proxy réactif refusé par les API natives : `shallowRef` + `toRaw()` avant `detect()`.
 - Décodages asynchrones (caméra et photo) liés à un jeton de session incrémenté à chaque ouverture/fermeture : une réponse tardive ne doit rien émettre.
 
+### Page de contrôle admin (relevés en relecture F13)
+- Relancer un job : `queue:retry` sur une ligne absente ou à payload non JSON pousse `"null"` dans la file **et** supprime la ligne. `FailedJobService::retry()` vérifie d'abord la ligne et le JSON, traduit tout échec de la commande (commande sérialisée corrompue ou illisible) en `FailedJobNotRetryableException`, la ligne restant intacte.
+- Lecture du log : ne jamais laisser une erreur d'E/S devenir une 500 (fichier tourné ou supprimé, illisible : liste vide) ; ignorer les liens symboliques ; lecture bornée depuis la fin (la première ligne coupée est écartée) ; couper le contexte Monolog (` {"`, ` ["`, ` [] []`) avant masquage et troncature.
+- Le masquage par motifs ne garantit rien : toute nouvelle forme de secret dans un message doit gagner un motif et un test dans `SecretMaskerTest` ; ne pas afficher plus que le message.
+- Le test « fichier de log illisible » est ignoré sous root (root lit tout) : il tourne en CI.
+
 ### Ziggy, Inertia, tests
 - Le seul `whereRaw` du projet est dans `SearchTerm` (`<colonne> like ? escape '!'`, valeur liée, `%` `_` `!` échappés). Pour toute recherche texte : réutiliser `SearchTerm::whereContains()` / `whereStartsWith()` / `ranked()`, ne jamais concaténer la saisie dans du SQL ni dans un motif. `whereLike()` de Laravel n'a pas de clause `ESCAPE` (SQLite n'a pas d'échappement par défaut) : `%` et `_` saisis deviendraient des jokers. Ne pas choisir `\` comme échappement (traité différemment selon le moteur).
 - `UDashboardSearch` vide son champ et se ferme à chaque choix ; ses groupes doivent porter `ignoreFilter: true` pour des résultats déjà filtrés par le serveur, sinon Fuse les refiltre côté client.
@@ -368,11 +386,8 @@
 ## Notes pour les features à venir
 
 - Page membre (F11) : les deux onglets sont toujours calculés ; si le volume grandit, charger l'onglet inactif à la demande (`Inertia::optional`).
-- F13 : la page de contrôle admin ira dans le groupe `admin` de Ziggy (`$adminRoutes`).
 - F12 : `LIKE '%terme%'` ne se sert d'aucun index (seuls `user_id`+`title` / `user_id`+`name` existent) : acceptable pour une famille, à revoir si les volumes grandissent.
-- F13 : page admin : compter aussi les recherches ? non requis (rien n'est journalisé côté recherche).
-- F13 : le journal `google_books_requests` (F07, modèle `App\Models\Library\GoogleBooksRequest`, statuts `GoogleBooksRequestStatus`) grossit sans fin : le purger (`Prunable` + durée de conservation configurable, `model:prune` planifié) ; un index `(status, created_at)` sera probablement utile pour les filtres de la page de contrôle (seul `created_at` est indexé aujourd'hui).
-- F14 : lancer le scheduler (service Docker `schedule:work` ou cron) : `model:prune` quotidien déclaré dans `routes/console.php` (F13) purge le journal Google Books (90 jours, `services.google_books.journal_retention_days`) ; garder un canal de log fichier `laravel*.log` dans `storage/logs` (lu par la page de contrôle F13) ou décider d'un autre affichage.
+- F14 : **lancer le scheduler** (service Docker `schedule:work` ou cron `schedule:run`) : sans lui, `model:prune` (quotidien, `routes/console.php`) ne purge jamais le journal Google Books ; garder un canal de log **fichier** (`single` ou `daily`, `storage/logs/laravel*.log`) : le bloc « Dernières erreurs » de la page de contrôle est vide si la prod ne loggue que sur stderr.
 - F14 : la caméra du scanner (F08) exige HTTPS (sauf `localhost`) ; nginx doit servir `.wasm` en `application/wasm` (sinon repli sans streaming, plus lent) ; configurer `trustProxies` (sinon tous les visiteurs partagent la même IP dans les limiteurs) ; les liens d'invitation signés exigent la bonne config proxy/HTTPS ; masquer `signature` dans les logs Nginx.
 - Les comptes ne peuvent pas être supprimés aujourd'hui ; les étagères se suppriment en cascade avec le compte.
 - Si un jour un compte peut être supprimé, supprimer aussi ses couvertures (`books.cover_path`) et ses photos d'outils (`tool_photos.path`) : la cascade SQL ne nettoie pas le disque.
