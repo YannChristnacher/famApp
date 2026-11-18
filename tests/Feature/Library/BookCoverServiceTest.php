@@ -55,29 +55,6 @@ it('deletes a stored cover and ignores a missing one', function () {
     expect(Storage::disk('public')->allFiles())->toBe([]);
 });
 
-/**
- * A JPEG photo with an EXIF block (big-endian TIFF): the Orientation tag and a
- * GPS sub-directory holding GPSLatitudeRef, as phones write them.
- */
-function photoWithExif(int $width, int $height, int $orientation): UploadedFile
-{
-    // Kept in a variable: the temporary file disappears with the fake upload.
-    $source = UploadedFile::fake()->image('photo.jpg', $width, $height);
-    $jpeg = (string) file_get_contents($source->getRealPath());
-    $gpsOffset = 8 + 2 + 2 * 12 + 4;
-    $ifd0 = pack('n', 2)
-        .pack('nnN', 0x0112, 3, 1).pack('n', $orientation)."\x00\x00"
-        .pack('nnNN', 0x8825, 4, 1, $gpsOffset)
-        .pack('N', 0);
-    $gps = pack('n', 1).pack('nnN', 0x0001, 2, 2)."N\x00\x00\x00".pack('N', 0);
-    $exif = "Exif\x00\x00"."MM\x00\x2A".pack('N', 8).$ifd0.$gps;
-
-    return UploadedFile::fake()->createWithContent(
-        'photo.jpg',
-        substr($jpeg, 0, 2)."\xFF\xE1".pack('n', strlen($exif) + 2).$exif.substr($jpeg, 2),
-    );
-}
-
 it('turns a sideways phone photo upright from its EXIF orientation, 800 pixels wide once upright', function (int $width, int $height, int $orientation, array $expected) {
     $path = app(BookCoverService::class)->store(photoWithExif($width, $height, $orientation));
 

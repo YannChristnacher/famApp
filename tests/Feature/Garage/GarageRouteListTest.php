@@ -12,6 +12,13 @@ $garageRoutes = [
     'garage.shelves.update',
     'garage.shelves.destroy',
     'garage.shelves.move',
+    'garage.tools.index',
+    'garage.tools.create',
+    'garage.tools.store',
+    'garage.tools.show',
+    'garage.tools.edit',
+    'garage.tools.update',
+    'garage.tools.destroy',
 ];
 
 it('exposes the garage routes to signed-in users', function (bool $admin) use ($garageRoutes) {

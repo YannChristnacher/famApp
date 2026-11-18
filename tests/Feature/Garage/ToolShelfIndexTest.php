@@ -46,5 +46,5 @@ it('never lists the bookshelves of the library', function () {
 it('opens the garage on the shelves page', function (bool $admin) {
     actingAs($admin ? User::factory()->admin()->create() : User::factory()->create());
 
-    get(route('garage.index'))->assertRedirect(route('garage.shelves.index'));
+    get(route('garage.index'))->assertRedirect(route('garage.tools.index'));
 })->with(['user' => [false], 'admin' => [true]]);

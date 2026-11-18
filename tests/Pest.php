@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Models\Garage\Tool;
 use App\Models\Garage\ToolShelf;
 use App\Models\Library\Bookshelf;
 use App\Models\User;
@@ -164,4 +165,69 @@ function jpegBytes(int $width, int $height): string
     imagejpeg($image);
 
     return (string) ob_get_clean();
+}
+
+/**
+ * A JPEG photo with an EXIF block (big-endian TIFF): the Orientation tag and a
+ * GPS sub-directory holding GPSLatitudeRef, as phones write them.
+ */
+function photoWithExif(int $width, int $height, int $orientation): UploadedFile
+{
+    // Kept in a variable: the temporary file disappears with the fake upload.
+    $source = UploadedFile::fake()->image('photo.jpg', $width, $height);
+    $jpeg = (string) file_get_contents($source->getRealPath());
+    $gpsOffset = 8 + 2 + 2 * 12 + 4;
+    $ifd0 = pack('n', 2)
+        .pack('nnN', 0x0112, 3, 1).pack('n', $orientation)."\x00\x00"
+        .pack('nnNN', 0x8825, 4, 1, $gpsOffset)
+        .pack('N', 0);
+    $gps = pack('n', 1).pack('nnN', 0x0001, 2, 2)."N\x00\x00\x00".pack('N', 0);
+    $exif = "Exif\x00\x00"."MM\x00\x2A".pack('N', 8).$ifd0.$gps;
+
+    return UploadedFile::fake()->createWithContent(
+        'photo.jpg',
+        substr($jpeg, 0, 2)."\xFF\xE1".pack('n', strlen($exif) + 2).$exif.substr($jpeg, 2),
+    );
+}
+
+/**
+ * Paths of the photos of a tool, in their order.
+ *
+ * @return list<string>
+ */
+function toolPhotoPaths(Tool $tool): array
+{
+    /** @var list<string> */
+    return $tool->photos()->pluck('path')->all();
+}
+
+/**
+ * Names of the accessories of a tool, in their order (positions must be 1..n).
+ *
+ * @return list<string>
+ */
+function toolAccessoryNames(Tool $tool): array
+{
+    $accessories = $tool->accessories()->get();
+    expect($accessories->pluck('position')->all())->toBe($accessories->isEmpty() ? [] : range(1, $accessories->count()));
+
+    /** @var list<string> */
+    return $accessories->pluck('name')->all();
+}
+
+/**
+ * A tool of the given user with photos stored on the (faked) public disk,
+ * named tools/<name>.jpg, in this order.
+ *
+ * @param  list<string>  $photos
+ */
+function toolWithPhotos(User $user, array $photos, string $name = 'Perceuse'): Tool
+{
+    $tool = Tool::factory()->for($user)->create(['name' => $name]);
+    foreach ($photos as $index => $photo) {
+        Storage::disk('public')->put("tools/{$photo}.jpg", 'photo');
+        $tool->photos()->create(['path' => "tools/{$photo}.jpg", 'position' => $index + 1]);
+    }
+
+    return $tool;
 }
