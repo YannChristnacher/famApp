@@ -23,5 +23,5 @@ Chaque feature a son plan dans `doc/features/<id>-<slug>.md` avant d'être codé
 | F12 | Recherche globale : endpoint agrégé par module + palette `UDashboardSearch` | Core | F11 | terminée |
 | F13 | Page de contrôle admin : demandes, compteurs, derniers ajouts, connexions, jobs en échec, erreurs, appels Google Books | Admin | F12 | terminée |
 | F15 | Champ commentaire facultatif sur les livres et les outils | Library, Garage | F13 | terminée |
-| F16 | Seeders de démonstration pour remplir la base en local | Core | F15 | à faire |
+| F16 | Seeders de démonstration pour remplir la base en local | Core | F15 | en cours |
 | F14 | Déploiement production sur VPS (Docker Compose prod, guide, sauvegarde MySQL) ; configurer trustProxies pour le reverse proxy, sinon tous les visiteurs partagent la même IP dans les limiteurs ; les liens d'invitation signés exigent la bonne config proxy/HTTPS (sinon refusés) ; masquer le paramètre `signature` des URL dans les logs Nginx ; lancer le scheduler (service Docker `schedule:work` ou cron) : la purge quotidienne `model:prune` du journal Google Books (F13) en dépend ; la page de contrôle lit les erreurs dans `storage/logs/laravel*.log` (si la prod loggue sur stderr, le bloc « Dernières erreurs » reste vide) | Ops | F13 | à faire |
