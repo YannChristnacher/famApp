@@ -191,4 +191,15 @@ describe('Garage/Shelves/Index', () => {
     await rowButton(wrapper, 0, 'Descendre').trigger('click')
     expect(patch).toHaveBeenLastCalledWith('/garage/shelves/4/move', { direction: 'down' }, expect.any(Object))
   })
+
+  it('links each shelf to its tools, and the page to all the tools (F10)', async () => {
+    const wrapper = await mountPage()
+
+    expect(rows(wrapper).map((row) => row.find('a[aria-label^="Voir les outils"]').attributes('href'))).toEqual([
+      '/garage/tools?shelf=4',
+      '/garage/tools?shelf=9',
+      '/garage/tools?shelf=2',
+    ])
+    expect(wrapper.find('a[href="/garage/tools"]').text()).toContain('Mes outils')
+  })
 })
