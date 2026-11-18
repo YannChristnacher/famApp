@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
+use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\HttpFoundation\Response;
 
 use function Pest\Laravel\actingAs;
@@ -76,7 +77,23 @@ it('hides the books of another user on every route that takes one', function (st
     bookCalls()[$call]($book)->assertNotFound();
 
     expectBookUnchanged($book);
-})->with(['show', 'edit', 'update', 'destroy'])->with(['user' => [false], 'admin' => [true]]);
+})->with(['edit', 'update', 'destroy'])->with(['user' => [false], 'admin' => [true]]);
+
+// Since F11 every member reads the books of the others (read-only): the page
+// opens, without any right to change the book.
+it('lets another user or an admin read the page of a book without changing it', function (bool $admin) {
+    $book = ownedBookWithCover();
+    actingAs($admin ? User::factory()->admin()->create() : User::factory()->create());
+
+    bookCalls()['show']($book)
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Library/Books/Show')
+            ->where('book.id', $book->id)
+            ->where('editable', false));
+
+    expectBookUnchanged($book);
+})->with(['user' => [false], 'admin' => [true]]);
 
 it('lets the owner reach every book route on their own book', function (string $call, int $status) {
     $book = ownedBookWithCover();

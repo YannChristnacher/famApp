@@ -25,6 +25,16 @@ it('lets only the owner change a tool shelf', function (string $ability) {
     expect($policy->{$ability}(toolShelfUserWithId(3, admin: true), $shelf)->denied())->toBeTrue();
 })->with(['update', 'delete', 'move']);
 
+// F11: every signed-in member reads the tool shelfs of the others (read-only).
+it('lets every signed-in user, admins included, view a tool shelf', function () {
+    $shelf = ToolShelf::factory()->make(['user_id' => 1, 'position' => 1]);
+    $policy = new ToolShelfPolicy;
+
+    expect($policy->view(toolShelfUserWithId(1), $shelf)->allowed())->toBeTrue()
+        ->and($policy->view(toolShelfUserWithId(2), $shelf)->allowed())->toBeTrue()
+        ->and($policy->view(toolShelfUserWithId(3, admin: true), $shelf)->allowed())->toBeTrue();
+});
+
 it('is the policy of the tool shelf model', function () {
     expect(Gate::getPolicyFor(ToolShelf::class))->toBeInstanceOf(ToolShelfPolicy::class);
 });

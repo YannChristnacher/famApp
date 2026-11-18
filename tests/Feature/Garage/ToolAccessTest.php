@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
+use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\HttpFoundation\Response;
 
 use function Pest\Laravel\actingAs;
@@ -80,7 +81,23 @@ it('hides the tools of another user on every route that takes one', function (st
     toolCalls()[$call]($tool)->assertNotFound();
 
     expectToolUnchanged($tool);
-})->with(['show', 'edit', 'update', 'destroy'])->with(['user' => [false], 'admin' => [true]]);
+})->with(['edit', 'update', 'destroy'])->with(['user' => [false], 'admin' => [true]]);
+
+// Since F11 every member reads the tools of the others (read-only): the page
+// opens, without any right to change the tool.
+it('lets another user or an admin read the page of a tool without changing it', function (bool $admin) {
+    $tool = ownedToolWithEverything();
+    actingAs($admin ? User::factory()->admin()->create() : User::factory()->create());
+
+    toolCalls()['show']($tool)
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Garage/Tools/Show')
+            ->where('tool.id', $tool->id)
+            ->where('editable', false));
+
+    expectToolUnchanged($tool);
+})->with(['user' => [false], 'admin' => [true]]);
 
 it('lets the owner reach every tool route on their own tool', function (string $call, int $status) {
     $tool = ownedToolWithEverything();
